@@ -1,0 +1,279 @@
+{
+    "name": "Social Media AI + Publer (Native Gemini v8)",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "social-media",
+                "responseMode": "responseNode",
+                "options": {}
+            },
+            "id": "webhook-trigger",
+            "name": "Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                100,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "promptType": "define",
+                "text": "=Sen profesyonel bir sosyal medya uzmanısın. \nŞu konu hakkında Türkçe, yaratıcı ve emojili bir sosyal medya caption yaz: {{ $json.body.content }}\n\nSADECE caption metnini döndür, başka açıklama yapma.",
+                "options": {}
+            },
+            "id": "gemini-agent",
+            "name": "Gemini AI Agent",
+            "type": "@n8n/n8n-nodes-langchain.agent",
+            "typeVersion": 2.2,
+            "position": [
+                400,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "options": {}
+            },
+            "id": "gemini-model",
+            "name": "Google Gemini Chat Model",
+            "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+            "typeVersion": 1,
+            "position": [
+                400,
+                400
+            ],
+            "credentials": {
+                "googlePalmApi": {
+                    "id": "PIRgIJn69sHnNuNU",
+                    "name": "Google Gemini(PaLM) Api account 3"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://fal.run/fal-ai/pika/v2.1/text-to-video",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Key 41adaa86-cd34-4d89-a492-ae7170f9b4c1:9997498e526f461d8697c62c62820b21"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"prompt\": \"{{ $('Webhook').first().json.body.content }}\",\n  \"aspect_ratio\": \"9:16\"\n}",
+                "options": {
+                    "timeout": 500000
+                }
+            },
+            "id": "fal-video",
+            "name": "Fal.ai Video",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                700,
+                400
+            ]
+        },
+        {
+            "parameters": {
+                "mode": "combine",
+                "combineBy": "combineByPosition",
+                "options": {}
+            },
+            "id": "merge-results",
+            "name": "Merge Results",
+            "type": "n8n-nodes-base.merge",
+            "typeVersion": 3,
+            "position": [
+                950,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const caption = $node[\"Gemini AI Agent\"].json[\"output\"];\nconst videoUrl = $node[\"Fal.ai Video\"].json[\"video\"][\"url\"];\nconst autoPublish = $('Webhook').first().json.body.autoPublish || false;\n\nreturn [{\n  json: {\n    caption: caption,\n    videoUrl: videoUrl,\n    autoPublish: autoPublish\n  }\n}];"
+            },
+            "id": "parse-code",
+            "name": "Parse Data",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1150,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "boolean": [
+                        {
+                            "value1": "={{ $json.autoPublish }}",
+                            "value2": true
+                        }
+                    ]
+                }
+            },
+            "id": "check-auto",
+            "name": "Auto Publish?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 1,
+            "position": [
+                1350,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://app.publer.com/api/v1/posts",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer 05759b05fa542536760046f3d8cf1172653b8b669ef12b34"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"workspace_id\": \"697e4aafea173ea72d403dc3\",\n  \"account_ids\": [\"697e508edbc27c1bab467ca4\"],\n  \"text\": \"{{ $json.caption }}\",\n  \"media_urls\": [\"{{ $json.videoUrl }}\"]\n}",
+                "options": {}
+            },
+            "id": "publer-post",
+            "name": "Publer Publish",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                1550,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={\n  \"success\": true,\n  \"caption\": \"{{ $json.caption }}\",\n  \"videoUrl\": \"{{ $json.videoUrl }}\",\n  \"published\": {{ $json.autoPublish }}\n}"
+            },
+            "id": "final-response",
+            "name": "Response",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "position": [
+                1750,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Gemini AI Agent",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Fal.ai Video",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Gemini AI Agent": {
+            "main": [
+                [
+                    {
+                        "node": "merge-results",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Google Gemini Chat Model": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "Gemini AI Agent",
+                        "type": "ai_languageModel",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Fal.ai Video": {
+            "main": [
+                [
+                    {
+                        "node": "merge-results",
+                        "type": "main",
+                        "index": 1
+                    }
+                ]
+            ]
+        },
+        "merge-results": {
+            "main": [
+                [
+                    {
+                        "node": "parse-code",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "parse-code": {
+            "main": [
+                [
+                    {
+                        "node": "check-auto",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "check-auto": {
+            "main": [
+                [
+                    {
+                        "node": "publer-post",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "final-response",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "publer-post": {
+            "main": [
+                [
+                    {
+                        "node": "final-response",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

@@ -1,0 +1,37 @@
+﻿src/components/Charts.tsx(21,1): error TS6133: 'Platform' is declared but its value is never read.
+src/components/Charts.tsx(83,25): error TS2322: Type '(value: number) => [string, ""]' is not assignable to type 'Formatter<number, "">'.
+  Types of parameters 'value' and 'value' are incompatible.
+    Type 'number | undefined' is not assignable to type 'number'.
+      Type 'undefined' is not assignable to type 'number'.
+src/components/Charts.tsx(141,67): error TS18048: 'percent' is possibly 'undefined'.
+src/components/Charts.tsx(150,25): error TS2322: Type '(value: number) => [string, "Post Say─▒s─▒"]' is not assignable to type 'Formatter<number, "Post Say─▒s─▒">'.
+  Types of parameters 'value' and 'value' are incompatible.
+    Type 'number | undefined' is not assignable to type 'number'.
+      Type 'undefined' is not assignable to type 'number'.
+src/components/Charts.tsx(197,25): error TS2322: Type '(value: number, name: string) => [string, "Eri┼şim" | "Engagement"]' is not assignable to type 'Formatter<number, string>'.
+  Types of parameters 'value' and 'value' are incompatible.
+    Type 'number | undefined' is not assignable to type 'number'.
+      Type 'undefined' is not assignable to type 'number'.
+src/components/Charts.tsx(232,25): error TS2322: Type '(value: number) => [string, "Eri┼şim"]' is not assignable to type 'Formatter<number, "Eri┼şim">'.
+  Types of parameters 'value' and 'value' are incompatible.
+    Type 'number | undefined' is not assignable to type 'number'.
+      Type 'undefined' is not assignable to type 'number'.
+src/components/Charts.tsx(292,25): error TS2322: Type '(value: number) => [string, ""]' is not assignable to type 'Formatter<number, "">'.
+  Types of parameters 'value' and 'value' are incompatible.
+    Type 'number | undefined' is not assignable to type 'number'.
+      Type 'undefined' is not assignable to type 'number'.
+src/components/EngagementMetrics.tsx(39,34): error TS2322: Type '(value: number) => [string, ""]' is not assignable to type 'Formatter<number, "">'.
+  Types of parameters 'value' and 'value' are incompatible.
+    Type 'number | undefined' is not assignable to type 'number'.
+      Type 'undefined' is not assignable to type 'number'.
+src/components/Header.tsx(26,79): error TS6133: 'onLogout' is declared but its value is never read.
+src/components/IntegrationsManager.tsx(40,30): error TS6133: 'publerSettings' is declared but its value is never read.
+src/components/IntegrationsManager.tsx(40,46): error TS6133: 'updatePublerSettings' is declared but its value is never read.
+src/components/ReportsSection.tsx(13,29): error TS6133: 'dailyEngagementData' is declared but its value is never read.
+src/components/ReportsSection.tsx(32,11): error TS6133: 'totalFollowers' is declared but its value is never read.
+src/components/ScheduleCalendar.tsx(24,15): error TS6133: 'targetDate' is declared but its value is never read.
+src/pages/AdminPage.tsx(11,5): error TS6133: 'Mail' is declared but its value is never read.
+src/pages/AdminPage.tsx(14,5): error TS6133: 'CheckCircle' is declared but its value is never read.
+src/utils/supabaseService.ts(10,60): error TS2741: Property 'clientId' is missing in type '{ id: string; title: string; content: string; imageUrls: string[]; platforms: Platform[]; scheduledTime: string; status: Post["status"]; metrics: { likes: number; comments: number; shares: number; reach: number; impressions: number; }; createdBy: string; createdAt: string; errorMessage: string | undefined; }' but required in type 'Post'.
+src/utils/supabaseService.ts(139,13): error TS2322: Type '{ platform: Platform; followers: any; followerGrowth: any; avgEngagementRate: number; postsCount: any; bestPostingTime: any; reach: any; impressions: any; }[]' is not assignable to type 'PlatformStats[]'.
+  Property 'clientId' is missing in type '{ platform: PlatformStats["platform"]; followers: any; followerGrowth: any; avgEngagementRate: number; postsCount: any; bestPostingTime: any; reach: any; impressions: any; }' but required in type 'PlatformStats'.
