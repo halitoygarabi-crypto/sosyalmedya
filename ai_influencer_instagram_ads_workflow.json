@@ -1,0 +1,565 @@
+{
+    "name": "AI Influencer Instagram Ads (v1.0)",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "ai-influencer-ad",
+                "responseMode": "responseNode",
+                "options": {}
+            },
+            "id": "webhook-trigger",
+            "name": "Webhook Trigger",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [0, 300]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Config Setup - Varsayılan değerlerle birleştir\nconst input = $input.first().json.body || $input.first().json;\n\nconst config = {\n  // Influencer Ayarları\n  influencer_name: input.influencer_name || 'Luna AI',\n  influencer_gender: input.influencer_gender || 'female',\n  influencer_look: input.influencer_look || 'Young Turkish woman, mid-20s, long dark hair, brown eyes, natural glowing makeup, warm confident smile, wearing a casual chic white top',\n  influencer_style: input.influencer_style || 'modern, clean, aesthetic, warm tones',\n  \n  // Ürün Bilgileri\n  product_name: input.product_name || 'Sample Product',\n  product_description: input.product_description || 'An amazing product',\n  brand_name: input.brand_name || 'Brand',\n  product_image_url: input.product_image_url || null,\n  \n  // Reklam Ayarları\n  ad_type: input.ad_type || 'both', // talking_head, product_showcase, both\n  ad_goal: input.ad_goal || 'conversion', // awareness, conversion, engagement\n  target_audience: input.target_audience || '25-40 yaş kadın, cilt bakımına önem veren',\n  language: input.language || 'tr',\n  tone: input.tone || 'samimi, güvenilir, bilgilendirici ama eğlenceli',\n  cta: input.cta || 'Hemen dene! 💫',\n  \n  // Video Ayarları\n  video_duration: input.video_duration || 15,\n  video_aspect_ratio: input.video_aspect_ratio || '9:16',\n  video_motion_preset: input.video_motion_preset || 'selfie',\n  \n  // Görsel Ayarları\n  image_model: input.image_model || 'fal-ai/flux-pro/v1.1-ultra',\n  image_style: input.image_style || 'photorealistic, instagram aesthetic, golden hour lighting, shallow depth of field',\n  image_size: input.image_size || 'portrait_9_16',\n  \n  // Instagram Ayarları\n  post_type: input.post_type || 'reel'\n};\n\nreturn [{ json: config }];"
+            },
+            "id": "config-setup",
+            "name": "Config Setup",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [220, 300]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.openai.com/v1/chat/completions",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer {{ $env.OPENAI_API_KEY }}"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"model\": \"gpt-4o\",\n  \"response_format\": { \"type\": \"json_object\" },\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Sen deneyimli bir dijital pazarlama uzmanı ve içerik yaratıcısısın. Instagram reklam kampanyaları için yaratıcı, ikna edici ve viral potansiyeli olan içerikler üretiyorsun. SADECE JSON formatında yanıt ver, başka hiçbir şey ekleme.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Şu ürün için Instagram reklam içeriği oluştur:\\n\\nÜrün: {{ $json.product_name }}\\nAçıklama: {{ $json.product_description }}\\nMarka: {{ $json.brand_name }}\\nHedef Kitle: {{ $json.target_audience }}\\nReklam Amacı: {{ $json.ad_goal }}\\nDil: {{ $json.language }}\\nTon: {{ $json.tone }}\\nCTA: {{ $json.cta }}\\nVideo Süresi: {{ $json.video_duration }} saniye\\n\\nInfluencer: {{ $json.influencer_name }}\\nInfluencer Görünüm: {{ $json.influencer_look }}\\n\\nAşağıdaki JSON formatında yanıt ver:\\n{\\n  \\\"ad_concept\\\": {\\n    \\\"theme\\\": \\\"Kampanya teması\\\",\\n    \\\"hook\\\": \\\"İlk 3 saniyedeki dikkat çekici cümle\\\",\\n    \\\"unique_selling_point\\\": \\\"Ana satış noktası\\\"\\n  },\\n  \\\"talking_head_script\\\": {\\n    \\\"full_script\\\": \\\"Tam video scripti ({{ $json.video_duration }} saniye)\\\",\\n    \\\"sections\\\": [\\n      {\\n        \\\"timestamp\\\": \\\"0-3s\\\",\\n        \\\"dialogue\\\": \\\"Hook cümlesi\\\",\\n        \\\"emotion\\\": \\\"surprised/excited/curious\\\",\\n        \\\"camera_direction\\\": \\\"Kamera yönlendirmesi\\\"\\n      }\\n    ]\\n  },\\n  \\\"image_prompts\\\": {\\n    \\\"influencer_main\\\": \\\"Ana influencer görseli için İngilizce prompt\\\",\\n    \\\"influencer_closeup\\\": \\\"Yakın çekim yüz görseli için İngilizce prompt\\\",\\n    \\\"product_hero\\\": \\\"Ürün hero shot için İngilizce prompt\\\",\\n    \\\"lifestyle\\\": \\\"Lifestyle sahne için İngilizce prompt\\\"\\n  },\\n  \\\"instagram_content\\\": {\\n    \\\"caption\\\": \\\"Instagram caption (emojili, 2200 karakter altı)\\\",\\n    \\\"hashtags\\\": \\\"10-15 ilgili hashtag\\\",\\n    \\\"best_posting_time\\\": \\\"En iyi paylaşım zamanı\\\"\\n  },\\n  \\\"ab_test\\\": {\\n    \\\"variation_a_hook\\\": \\\"Alternatif hook A\\\",\\n    \\\"variation_b_hook\\\": \\\"Alternatif hook B\\\"\\n  }\\n}\"\n    }\n  ],\n  \"temperature\": 0.8,\n  \"max_tokens\": 2000\n}",
+                "options": {
+                    "timeout": 60000
+                }
+            },
+            "id": "gpt4o-planner",
+            "name": "GPT-4o Reklam Planı",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [440, 300]
+        },
+        {
+            "parameters": {
+                "jsCode": "// GPT-4o yanıtını parse et\nconst gptResponse = $input.first().json;\nconst config = $node['Config Setup'].json;\n\nlet adPlan;\ntry {\n  const content = gptResponse.choices[0].message.content;\n  adPlan = JSON.parse(content);\n} catch (e) {\n  throw new Error('GPT yanıtı parse edilemedi: ' + e.message);\n}\n\nreturn [{\n  json: {\n    config: config,\n    ad_plan: adPlan\n  }\n}];"
+            },
+            "id": "parse-gpt-response",
+            "name": "Parse GPT Response",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [660, 300]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://fal.run/fal-ai/flux-pro/v1.1-ultra",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Key {{ $env.FAL_API_KEY }}"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"prompt\": \"{{ $json.ad_plan.image_prompts.influencer_main }}, {{ $json.config.image_style }}\",\n  \"image_size\": \"{{ $json.config.image_size }}\",\n  \"num_inference_steps\": 28,\n  \"guidance_scale\": 3.5,\n  \"enable_safety_checker\": true\n}",
+                "options": {
+                    "timeout": 120000
+                }
+            },
+            "id": "fal-image-main",
+            "name": "Fal.ai Ana Görsel",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [880, 100]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://fal.run/fal-ai/flux-pro/v1.1-ultra",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Key {{ $env.FAL_API_KEY }}"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"prompt\": \"{{ $json.ad_plan.image_prompts.influencer_closeup }}, {{ $json.config.image_style }}\",\n  \"image_size\": \"{{ $json.config.image_size }}\",\n  \"num_inference_steps\": 28,\n  \"guidance_scale\": 3.5,\n  \"enable_safety_checker\": true\n}",
+                "options": {
+                    "timeout": 120000
+                }
+            },
+            "id": "fal-image-closeup",
+            "name": "Fal.ai Yakın Çekim",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [880, 260]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://fal.run/fal-ai/flux-pro/v1.1-ultra",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Key {{ $env.FAL_API_KEY }}"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"prompt\": \"{{ $json.ad_plan.image_prompts.product_hero }}, {{ $json.config.image_style }}\",\n  \"image_size\": \"{{ $json.config.image_size }}\",\n  \"num_inference_steps\": 28,\n  \"guidance_scale\": 3.5,\n  \"enable_safety_checker\": true\n}",
+                "options": {
+                    "timeout": 120000
+                }
+            },
+            "id": "fal-image-product",
+            "name": "Fal.ai Ürün Hero",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [880, 420]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://fal.run/fal-ai/flux-pro/v1.1-ultra",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Key {{ $env.FAL_API_KEY }}"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"prompt\": \"{{ $json.ad_plan.image_prompts.lifestyle }}, {{ $json.config.image_style }}\",\n  \"image_size\": \"{{ $json.config.image_size }}\",\n  \"num_inference_steps\": 28,\n  \"guidance_scale\": 3.5,\n  \"enable_safety_checker\": true\n}",
+                "options": {
+                    "timeout": 120000
+                }
+            },
+            "id": "fal-image-lifestyle",
+            "name": "Fal.ai Lifestyle",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [880, 580]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Tüm görselleri topla\nconst parseResponse = $node['Parse GPT Response'].json;\nconst mainImage = $node['Fal.ai Ana Görsel'].json;\nconst closeupImage = $node['Fal.ai Yakın Çekim'].json;\nconst productImage = $node['Fal.ai Ürün Hero'].json;\nconst lifestyleImage = $node['Fal.ai Lifestyle'].json;\n\nconst images = {\n  influencer_main: mainImage.images?.[0]?.url || mainImage.url,\n  influencer_closeup: closeupImage.images?.[0]?.url || closeupImage.url,\n  product_hero: productImage.images?.[0]?.url || productImage.url,\n  lifestyle: lifestyleImage.images?.[0]?.url || lifestyleImage.url\n};\n\nreturn [{\n  json: {\n    config: parseResponse.config,\n    ad_plan: parseResponse.ad_plan,\n    images: images\n  }\n}];"
+            },
+            "id": "collect-images",
+            "name": "Görselleri Topla",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [1100, 300]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.higgsfield.ai/v1/diffusion-output-picture",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer {{ $env.HIGGSFIELD_API_KEY }}"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"image_url\": \"{{ $json.images.influencer_main }}\",\n  \"prompt\": \"{{ $json.ad_plan.talking_head_script.sections[0].dialogue }}, natural talking selfie video, direct eye contact with camera\",\n  \"preset\": \"{{ $json.config.video_motion_preset }}\",\n  \"duration\": {{ $json.config.video_duration }},\n  \"aspect_ratio\": \"{{ $json.config.video_aspect_ratio }}\"\n}",
+                "options": {
+                    "timeout": 300000
+                }
+            },
+            "id": "higgsfield-talking",
+            "name": "Higgsfield Konuşmalı",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [1320, 100]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.higgsfield.ai/v1/diffusion-output-picture",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer {{ $env.HIGGSFIELD_API_KEY }}"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"image_url\": \"{{ $json.images.product_hero }}\",\n  \"prompt\": \"Product showcase video, slow rotation, dramatic lighting, premium feel\",\n  \"preset\": \"crash-zoom\",\n  \"duration\": 5,\n  \"aspect_ratio\": \"{{ $json.config.video_aspect_ratio }}\"\n}",
+                "options": {
+                    "timeout": 300000
+                }
+            },
+            "id": "higgsfield-product",
+            "name": "Higgsfield Ürün Video",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [1320, 300]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.higgsfield.ai/v1/diffusion-output-picture",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer {{ $env.HIGGSFIELD_API_KEY }}"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"image_url\": \"{{ $json.images.lifestyle }}\",\n  \"prompt\": \"Cinematic lifestyle video, subtle camera movement, warm atmosphere\",\n  \"preset\": \"dolly-in\",\n  \"duration\": 5,\n  \"aspect_ratio\": \"{{ $json.config.video_aspect_ratio }}\"\n}",
+                "options": {
+                    "timeout": 300000
+                }
+            },
+            "id": "higgsfield-lifestyle",
+            "name": "Higgsfield Lifestyle",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [1320, 500]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Video yanıtlarını topla ve polling kontrolü yap\nconst collectImages = $node['Görselleri Topla'].json;\nconst talkingVideo = $node['Higgsfield Konuşmalı'].json;\nconst productVideo = $node['Higgsfield Ürün Video'].json;\nconst lifestyleVideo = $node['Higgsfield Lifestyle'].json;\n\n// Higgsfield response yapısını kontrol et\nconst getVideoUrl = (response) => {\n  if (response.video_url) return response.video_url;\n  if (response.output?.video_url) return response.output.video_url;\n  if (response.result?.video_url) return response.result.video_url;\n  if (response.request_id) return { status: 'processing', request_id: response.request_id };\n  return null;\n};\n\nconst videos = {\n  talking_head: getVideoUrl(talkingVideo),\n  product_showcase: getVideoUrl(productVideo),\n  lifestyle: getVideoUrl(lifestyleVideo)\n};\n\nreturn [{\n  json: {\n    config: collectImages.config,\n    ad_plan: collectImages.ad_plan,\n    images: collectImages.images,\n    videos: videos\n  }\n}];"
+            },
+            "id": "collect-videos",
+            "name": "Videoları Topla",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [1540, 300]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Final Output Builder\nconst data = $input.first().json;\n\nconst output = {\n  success: true,\n  timestamp: new Date().toISOString(),\n  \n  // Meta bilgiler\n  influencer: data.config.influencer_name,\n  brand: data.config.brand_name,\n  product: data.config.product_name,\n  \n  // Reklam konsepti\n  ad_concept: data.ad_plan.ad_concept,\n  \n  // Talking head reklam\n  talking_head_ad: {\n    full_script: data.ad_plan.talking_head_script.full_script,\n    script_sections: data.ad_plan.talking_head_script.sections,\n    video_url: data.videos.talking_head\n  },\n  \n  // Üretilen görseller\n  images: data.images,\n  \n  // Üretilen videolar\n  videos: data.videos,\n  \n  // Instagram içeriği\n  instagram: {\n    reel: {\n      caption: data.ad_plan.instagram_content.caption,\n      hashtags: data.ad_plan.instagram_content.hashtags,\n      best_posting_time: data.ad_plan.instagram_content.best_posting_time\n    }\n  },\n  \n  // A/B test alternatifleri\n  ab_test: data.ad_plan.ab_test,\n  \n  // Maliyet tahmini\n  estimated_cost: {\n    gpt4o: 0.04,\n    fal_images: 0.10,\n    higgsfield_videos: 0.30,\n    total: 0.44\n  }\n};\n\nreturn [{ json: output }];"
+            },
+            "id": "final-output-builder",
+            "name": "Final Output Builder",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [1760, 300]
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={{ JSON.stringify($json) }}"
+            },
+            "id": "webhook-response",
+            "name": "Webhook Response",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "position": [1980, 300]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://graph.facebook.com/v18.0/{{ $env.INSTAGRAM_BUSINESS_ACCOUNT_ID }}/media",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer {{ $env.INSTAGRAM_ACCESS_TOKEN }}"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"video_url\": \"{{ $json.videos.talking_head }}\",\n  \"caption\": \"{{ $json.instagram.reel.caption }}\\n\\n{{ $json.instagram.reel.hashtags }}\",\n  \"media_type\": \"REELS\"\n}",
+                "options": {}
+            },
+            "id": "instagram-post",
+            "name": "Instagram Post (Opsiyonel)",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [1980, 100],
+            "disabled": true
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "{{ $env.SLACK_WEBHOOK_URL }}",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"text\": \"🎬 Yeni AI Influencer Reklam Seti Hazır!\\n\\n*Influencer:* {{ $json.influencer }}\\n*Marka:* {{ $json.brand }}\\n*Ürün:* {{ $json.product }}\\n\\n📸 4 görsel + 🎥 3 video üretildi\\n\\n*Hook:* {{ $json.ad_concept.hook }}\"\n}",
+                "options": {}
+            },
+            "id": "slack-notification",
+            "name": "Slack Bildirimi (Opsiyonel)",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [1980, 500],
+            "disabled": true
+        }
+    ],
+    "connections": {
+        "Webhook Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Config Setup",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Config Setup": {
+            "main": [
+                [
+                    {
+                        "node": "GPT-4o Reklam Planı",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "GPT-4o Reklam Planı": {
+            "main": [
+                [
+                    {
+                        "node": "Parse GPT Response",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse GPT Response": {
+            "main": [
+                [
+                    {
+                        "node": "Fal.ai Ana Görsel",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Fal.ai Yakın Çekim",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Fal.ai Ürün Hero",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Fal.ai Lifestyle",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Fal.ai Ana Görsel": {
+            "main": [
+                [
+                    {
+                        "node": "Görselleri Topla",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Fal.ai Yakın Çekim": {
+            "main": [
+                [
+                    {
+                        "node": "Görselleri Topla",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Fal.ai Ürün Hero": {
+            "main": [
+                [
+                    {
+                        "node": "Görselleri Topla",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Fal.ai Lifestyle": {
+            "main": [
+                [
+                    {
+                        "node": "Görselleri Topla",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Görselleri Topla": {
+            "main": [
+                [
+                    {
+                        "node": "Higgsfield Konuşmalı",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Higgsfield Ürün Video",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Higgsfield Lifestyle",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Higgsfield Konuşmalı": {
+            "main": [
+                [
+                    {
+                        "node": "Videoları Topla",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Higgsfield Ürün Video": {
+            "main": [
+                [
+                    {
+                        "node": "Videoları Topla",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Higgsfield Lifestyle": {
+            "main": [
+                [
+                    {
+                        "node": "Videoları Topla",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Videoları Topla": {
+            "main": [
+                [
+                    {
+                        "node": "Final Output Builder",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Final Output Builder": {
+            "main": [
+                [
+                    {
+                        "node": "Webhook Response",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Instagram Post (Opsiyonel)",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Slack Bildirimi (Opsiyonel)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    },
+    "staticData": null,
+    "tags": [
+        {
+            "id": "ai-influencer",
+            "name": "AI Influencer"
+        },
+        {
+            "id": "instagram-ads",
+            "name": "Instagram Ads"
+        }
+    ]
+}

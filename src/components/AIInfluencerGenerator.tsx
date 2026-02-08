@@ -16,6 +16,12 @@ import {
     Play,
     Video,
     Settings,
+    Megaphone,
+    Target,
+    Image,
+    Film,
+    Send,
+    X,
 } from 'lucide-react';
 import { aiInfluencerService } from '../utils/aiInfluencerService';
 import { aiTalkingService } from '../utils/aiTalkingService';
@@ -23,6 +29,55 @@ import { ltxVideoService } from '../utils/ltxVideoService';
 import { higgsfieldService } from '../utils/higgsfieldService';
 import type { InfluencerGenerationRequest, InfluencerGenerationResponse } from '../utils/aiInfluencerService';
 import { useDashboard } from '../context/DashboardContext';
+
+// n8n Webhook URL for AI Influencer Ads
+const N8N_AI_INFLUENCER_WEBHOOK = import.meta.env.VITE_N8N_AI_INFLUENCER_TEST_WEBHOOK_URL || 'https://n8n.polmarkai.pro/webhook-test/ai-influencer-ad';
+
+interface AdCampaignRequest {
+    influencer_name: string;
+    influencer_gender: string;
+    influencer_look: string;
+    product_name: string;
+    product_description: string;
+    brand_name: string;
+    ad_goal: 'awareness' | 'conversion' | 'engagement';
+    target_audience: string;
+    tone: string;
+    cta: string;
+    video_duration: number;
+    video_aspect_ratio: string;
+}
+
+interface AdCampaignResponse {
+    success: boolean;
+    influencer?: string;
+    brand?: string;
+    product?: string;
+    ad_concept?: {
+        theme: string;
+        hook: string;
+        unique_selling_point: string;
+    };
+    images?: {
+        influencer_main: string;
+        influencer_closeup: string;
+        product_hero: string;
+        lifestyle: string;
+    };
+    videos?: {
+        talking_head: string;
+        product_showcase: string;
+        lifestyle: string;
+    };
+    instagram?: {
+        reel: {
+            caption: string;
+            hashtags: string;
+            best_posting_time: string;
+        };
+    };
+    error?: string;
+}
 
 const AIInfluencerGenerator: React.FC = () => {
     const { addNotification } = useDashboard();
@@ -53,6 +108,25 @@ const AIInfluencerGenerator: React.FC = () => {
     // API Key state
     const [showApiKeyModal, setShowApiKeyModal] = useState(false);
     const [apiKey, setApiKey] = useState(aiInfluencerService.getApiKey());
+
+    // n8n AI Influencer Ads Campaign State
+    const [showAdCampaignModal, setShowAdCampaignModal] = useState(false);
+    const [isCreatingCampaign, setIsCreatingCampaign] = useState(false);
+    const [campaignResult, setCampaignResult] = useState<AdCampaignResponse | null>(null);
+    const [adCampaign, setAdCampaign] = useState<AdCampaignRequest>({
+        influencer_name: 'Luna AI',
+        influencer_gender: 'female',
+        influencer_look: 'Young Turkish woman, mid-20s, long dark hair, brown eyes, natural glowing makeup, warm confident smile',
+        product_name: '',
+        product_description: '',
+        brand_name: '',
+        ad_goal: 'conversion',
+        target_audience: '25-40 yaş arası, dijital ürünlere ilgi duyan',
+        tone: 'samimi, güvenilir, bilgilendirici',
+        cta: 'Hemen dene! 💫',
+        video_duration: 15,
+        video_aspect_ratio: '9:16'
+    });
 
     const updatePromptFromPersona = useCallback(() => {
         const fullPrompt = `High-quality professional photo of a ${persona.age} year old ${persona.ethnicity} ${persona.gender}, ${persona.style}, ${persona.activity}, at a ${persona.location}, detailed features, realistic skin texture, 8k resolution, cinematic lighting, shot on 35mm lens.`;
@@ -148,6 +222,52 @@ const AIInfluencerGenerator: React.FC = () => {
         }
     }, [result, script, addNotification, talkingProvider]);
 
+    // n8n AI Influencer Ads Campaign Handler
+    const handleCreateAdCampaign = useCallback(async () => {
+        if (!adCampaign.product_name.trim() || !adCampaign.product_description.trim()) {
+            addNotification({ type: 'warning', message: 'Lütfen ürün adı ve açıklamasını girin', read: false });
+            return;
+        }
+
+        setIsCreatingCampaign(true);
+        setCampaignResult(null);
+        addNotification({ type: 'info', message: '🎬 AI Influencer reklam kampanyası oluşturuluyor... Bu işlem 2-5 dakika sürebilir.', read: false });
+
+        try {
+            const response = await fetch(N8N_AI_INFLUENCER_WEBHOOK, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(adCampaign),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data: AdCampaignResponse = await response.json();
+            
+            setIsCreatingCampaign(false);
+            setCampaignResult(data);
+
+            if (data.success) {
+                addNotification({ 
+                    type: 'success', 
+                    message: `✅ Reklam kampanyası başarıyla oluşturuldu! ${data.images ? '4 görsel' : ''} ${data.videos ? '+ 3 video' : ''} hazır.`, 
+                    read: false 
+                });
+            } else {
+                addNotification({ type: 'error', message: `❌ ${data.error || 'Kampanya oluşturulamadı'}`, read: false });
+            }
+        } catch (error) {
+            setIsCreatingCampaign(false);
+            const errorMessage = error instanceof Error ? error.message : 'Bilinmeyen hata';
+            addNotification({ type: 'error', message: `❌ Kampanya hatası: ${errorMessage}`, read: false });
+            setCampaignResult({ success: false, error: errorMessage });
+        }
+    }, [adCampaign, addNotification]);
+
     const personaTemplates = [
         { name: 'Moda İkonu', style: 'fashion influencer wearing elegant designer clothes', location: 'Milan street' },
         { name: 'Gezgin', style: 'travel blogger in outdoor gear', location: 'Swiss Alps' },
@@ -169,16 +289,32 @@ const AIInfluencerGenerator: React.FC = () => {
                     </h2>
                     <p className="text-muted text-sm">Hayali karakterler ve profesyonel sosyal medya içerikleri üretin</p>
                 </div>
-                <button
-                    className="btn btn-ghost btn-icon"
-                    onClick={() => {
-                        setApiKey(provider === 'fal' ? aiInfluencerService.getApiKey() : higgsfieldService.getApiKey());
-                        setShowApiKeyModal(true);
-                    }}
-                    title="API Ayarları"
-                >
-                    <Settings size={20} />
-                </button>
+                <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+                    <button
+                        className="btn btn-primary"
+                        onClick={() => setShowAdCampaignModal(true)}
+                        style={{ 
+                            background: 'linear-gradient(135deg, #f43f5e 0%, #ec4899 100%)',
+                            boxShadow: '0 4px 15px rgba(244, 63, 94, 0.3)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                        }}
+                    >
+                        <Megaphone size={18} />
+                        <span>AI Reklam Kampanyası</span>
+                    </button>
+                    <button
+                        className="btn btn-ghost btn-icon"
+                        onClick={() => {
+                            setApiKey(provider === 'fal' ? aiInfluencerService.getApiKey() : higgsfieldService.getApiKey());
+                            setShowApiKeyModal(true);
+                        }}
+                        title="API Ayarları"
+                    >
+                        <Settings size={20} />
+                    </button>
+                </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '350px 1fr 320px', gap: 'var(--spacing-xl)', alignItems: 'start' }}>
@@ -571,6 +707,409 @@ const AIInfluencerGenerator: React.FC = () => {
                     )}
                 </div>
             </div>
+
+            {/* AI Reklam Kampanyası Modal */}
+            {showAdCampaignModal && (
+                <div className="modal-overlay" onClick={() => !isCreatingCampaign && setShowAdCampaignModal(false)}>
+                    <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '800px', maxHeight: '90vh', overflow: 'auto' }}>
+                        <div className="modal-header" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: 'var(--spacing-md)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+                                <div style={{ 
+                                    width: '40px', 
+                                    height: '40px', 
+                                    borderRadius: '12px', 
+                                    background: 'linear-gradient(135deg, #f43f5e 0%, #ec4899 100%)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}>
+                                    <Megaphone size={20} color="white" />
+                                </div>
+                                <div>
+                                    <h2 className="modal-title" style={{ marginBottom: '4px' }}>AI Influencer Reklam Kampanyası</h2>
+                                    <p className="text-xs text-muted">GPT-4o + Fal.ai + Higgsfield ile otomatik reklam üretimi</p>
+                                </div>
+                            </div>
+                            <button 
+                                className="btn btn-ghost btn-icon" 
+                                onClick={() => setShowAdCampaignModal(false)}
+                                disabled={isCreatingCampaign}
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        
+                        <div className="modal-body" style={{ padding: 'var(--spacing-xl)' }}>
+                            {!campaignResult ? (
+                                <>
+                                    {/* Ürün Bilgileri */}
+                                    <div style={{ marginBottom: 'var(--spacing-xl)' }}>
+                                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: 'var(--spacing-md)', fontSize: '1rem', fontWeight: 600 }}>
+                                            <Target size={18} color="var(--accent-primary)" />
+                                            Ürün Bilgileri
+                                        </h3>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-md)' }}>
+                                            <div className="input-group">
+                                                <label className="input-label">Ürün Adı *</label>
+                                                <input
+                                                    type="text"
+                                                    className="input"
+                                                    placeholder="Örn: GlowSkin Hyaluronik Serum"
+                                                    value={adCampaign.product_name}
+                                                    onChange={(e) => setAdCampaign({...adCampaign, product_name: e.target.value})}
+                                                    disabled={isCreatingCampaign}
+                                                />
+                                            </div>
+                                            <div className="input-group">
+                                                <label className="input-label">Marka Adı</label>
+                                                <input
+                                                    type="text"
+                                                    className="input"
+                                                    placeholder="Örn: GlowSkin Beauty"
+                                                    value={adCampaign.brand_name}
+                                                    onChange={(e) => setAdCampaign({...adCampaign, brand_name: e.target.value})}
+                                                    disabled={isCreatingCampaign}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="input-group" style={{ marginTop: 'var(--spacing-md)' }}>
+                                            <label className="input-label">Ürün Açıklaması *</label>
+                                            <textarea
+                                                className="input"
+                                                rows={2}
+                                                placeholder="Ürünün özelliklerini ve faydalarını detaylı yazın..."
+                                                value={adCampaign.product_description}
+                                                onChange={(e) => setAdCampaign({...adCampaign, product_description: e.target.value})}
+                                                disabled={isCreatingCampaign}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Influencer & Hedef Kitle */}
+                                    <div style={{ marginBottom: 'var(--spacing-xl)' }}>
+                                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: 'var(--spacing-md)', fontSize: '1rem', fontWeight: 600 }}>
+                                            <Users size={18} color="var(--accent-primary)" />
+                                            Influencer & Hedef Kitle
+                                        </h3>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-md)' }}>
+                                            <div className="input-group">
+                                                <label className="input-label">Influencer Adı</label>
+                                                <input
+                                                    type="text"
+                                                    className="input"
+                                                    placeholder="Örn: Luna AI"
+                                                    value={adCampaign.influencer_name}
+                                                    onChange={(e) => setAdCampaign({...adCampaign, influencer_name: e.target.value})}
+                                                    disabled={isCreatingCampaign}
+                                                />
+                                            </div>
+                                            <div className="input-group">
+                                                <label className="input-label">Cinsiyet</label>
+                                                <select
+                                                    className="input select"
+                                                    value={adCampaign.influencer_gender}
+                                                    onChange={(e) => setAdCampaign({...adCampaign, influencer_gender: e.target.value})}
+                                                    disabled={isCreatingCampaign}
+                                                >
+                                                    <option value="female">Kadın</option>
+                                                    <option value="male">Erkek</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div className="input-group" style={{ marginTop: 'var(--spacing-md)' }}>
+                                            <label className="input-label">Influencer Görünümü (İngilizce)</label>
+                                            <input
+                                                type="text"
+                                                className="input"
+                                                placeholder="Young Turkish woman, mid-20s, long dark hair..."
+                                                value={adCampaign.influencer_look}
+                                                onChange={(e) => setAdCampaign({...adCampaign, influencer_look: e.target.value})}
+                                                disabled={isCreatingCampaign}
+                                            />
+                                        </div>
+                                        <div className="input-group" style={{ marginTop: 'var(--spacing-md)' }}>
+                                            <label className="input-label">Hedef Kitle</label>
+                                            <input
+                                                type="text"
+                                                className="input"
+                                                placeholder="25-40 yaş kadın, cilt bakımına önem veren..."
+                                                value={adCampaign.target_audience}
+                                                onChange={(e) => setAdCampaign({...adCampaign, target_audience: e.target.value})}
+                                                disabled={isCreatingCampaign}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Reklam Ayarları */}
+                                    <div style={{ marginBottom: 'var(--spacing-xl)' }}>
+                                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: 'var(--spacing-md)', fontSize: '1rem', fontWeight: 600 }}>
+                                            <Film size={18} color="var(--accent-primary)" />
+                                            Reklam Ayarları
+                                        </h3>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--spacing-md)' }}>
+                                            <div className="input-group">
+                                                <label className="input-label">Reklam Amacı</label>
+                                                <select
+                                                    className="input select"
+                                                    value={adCampaign.ad_goal}
+                                                    onChange={(e) => setAdCampaign({...adCampaign, ad_goal: e.target.value as 'awareness' | 'conversion' | 'engagement'})}
+                                                    disabled={isCreatingCampaign}
+                                                >
+                                                    <option value="conversion">Satış / Dönüşüm</option>
+                                                    <option value="awareness">Marka Bilinirliği</option>
+                                                    <option value="engagement">Etkileşim</option>
+                                                </select>
+                                            </div>
+                                            <div className="input-group">
+                                                <label className="input-label">Video Süresi</label>
+                                                <select
+                                                    className="input select"
+                                                    value={adCampaign.video_duration}
+                                                    onChange={(e) => setAdCampaign({...adCampaign, video_duration: parseInt(e.target.value)})}
+                                                    disabled={isCreatingCampaign}
+                                                >
+                                                    <option value={10}>10 saniye</option>
+                                                    <option value={15}>15 saniye</option>
+                                                    <option value={30}>30 saniye</option>
+                                                </select>
+                                            </div>
+                                            <div className="input-group">
+                                                <label className="input-label">Video Oranı</label>
+                                                <select
+                                                    className="input select"
+                                                    value={adCampaign.video_aspect_ratio}
+                                                    onChange={(e) => setAdCampaign({...adCampaign, video_aspect_ratio: e.target.value})}
+                                                    disabled={isCreatingCampaign}
+                                                >
+                                                    <option value="9:16">9:16 (Reels/TikTok)</option>
+                                                    <option value="1:1">1:1 (Kare)</option>
+                                                    <option value="16:9">16:9 (YouTube)</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-md)', marginTop: 'var(--spacing-md)' }}>
+                                            <div className="input-group">
+                                                <label className="input-label">Ses Tonu</label>
+                                                <input
+                                                    type="text"
+                                                    className="input"
+                                                    placeholder="samimi, güvenilir, eğlenceli..."
+                                                    value={adCampaign.tone}
+                                                    onChange={(e) => setAdCampaign({...adCampaign, tone: e.target.value})}
+                                                    disabled={isCreatingCampaign}
+                                                />
+                                            </div>
+                                            <div className="input-group">
+                                                <label className="input-label">Call-to-Action (CTA)</label>
+                                                <input
+                                                    type="text"
+                                                    className="input"
+                                                    placeholder="Hemen dene! 💫"
+                                                    value={adCampaign.cta}
+                                                    onChange={(e) => setAdCampaign({...adCampaign, cta: e.target.value})}
+                                                    disabled={isCreatingCampaign}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Maliyet Tahmini */}
+                                    <div style={{ 
+                                        background: 'var(--bg-tertiary)', 
+                                        borderRadius: 'var(--radius-lg)', 
+                                        padding: 'var(--spacing-lg)',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center'
+                                    }}>
+                                        <div>
+                                            <p className="text-sm" style={{ fontWeight: 600, marginBottom: '4px' }}>Tahmini Üretim</p>
+                                            <p className="text-xs text-muted">4 görsel + 3 video • ~2-5 dakika</p>
+                                        </div>
+                                        <div style={{ textAlign: 'right' }}>
+                                            <p className="text-sm" style={{ fontWeight: 600, color: 'var(--success)' }}>~$0.45</p>
+                                            <p className="text-xs text-muted">tahmini maliyet</p>
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                /* Kampanya Sonuçları */
+                                <div>
+                                    {campaignResult.success ? (
+                                        <>
+                                            <div style={{ 
+                                                background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%)',
+                                                borderRadius: 'var(--radius-lg)',
+                                                padding: 'var(--spacing-lg)',
+                                                marginBottom: 'var(--spacing-xl)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 'var(--spacing-md)'
+                                            }}>
+                                                <CheckCircle size={24} color="var(--success)" />
+                                                <div>
+                                                    <p style={{ fontWeight: 600, color: 'var(--success)' }}>Kampanya Başarıyla Oluşturuldu!</p>
+                                                    <p className="text-sm text-muted">{campaignResult.influencer} için {campaignResult.product} reklamları hazır.</p>
+                                                </div>
+                                            </div>
+
+                                            {/* Reklam Konsepti */}
+                                            {campaignResult.ad_concept && (
+                                                <div style={{ marginBottom: 'var(--spacing-xl)' }}>
+                                                    <h4 style={{ marginBottom: 'var(--spacing-md)', fontWeight: 600 }}>🎯 Reklam Konsepti</h4>
+                                                    <div style={{ background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', padding: 'var(--spacing-md)' }}>
+                                                        <p><strong>Tema:</strong> {campaignResult.ad_concept.theme}</p>
+                                                        <p><strong>Hook:</strong> {campaignResult.ad_concept.hook}</p>
+                                                        <p><strong>USP:</strong> {campaignResult.ad_concept.unique_selling_point}</p>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Görseller */}
+                                            {campaignResult.images && (
+                                                <div style={{ marginBottom: 'var(--spacing-xl)' }}>
+                                                    <h4 style={{ marginBottom: 'var(--spacing-md)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        <Image size={18} /> Üretilen Görseller
+                                                    </h4>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--spacing-sm)' }}>
+                                                        {Object.entries(campaignResult.images).map(([key, url]) => (
+                                                            <a key={key} href={url} target="_blank" rel="noopener noreferrer" style={{ display: 'block' }}>
+                                                                <img 
+                                                                    src={url} 
+                                                                    alt={key} 
+                                                                    style={{ 
+                                                                        width: '100%', 
+                                                                        aspectRatio: '1', 
+                                                                        objectFit: 'cover', 
+                                                                        borderRadius: 'var(--radius-md)' 
+                                                                    }} 
+                                                                />
+                                                                <p className="text-xs text-muted text-center mt-xs">{key.replace(/_/g, ' ')}</p>
+                                                            </a>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Videolar */}
+                                            {campaignResult.videos && (
+                                                <div style={{ marginBottom: 'var(--spacing-xl)' }}>
+                                                    <h4 style={{ marginBottom: 'var(--spacing-md)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        <Film size={18} /> Üretilen Videolar
+                                                    </h4>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--spacing-md)' }}>
+                                                        {Object.entries(campaignResult.videos).map(([key, url]) => (
+                                                            <div key={key}>
+                                                                {typeof url === 'string' ? (
+                                                                    <video 
+                                                                        src={url} 
+                                                                        controls 
+                                                                        style={{ 
+                                                                            width: '100%', 
+                                                                            borderRadius: 'var(--radius-md)' 
+                                                                        }} 
+                                                                    />
+                                                                ) : (
+                                                                    <div style={{ 
+                                                                        background: 'var(--bg-tertiary)', 
+                                                                        borderRadius: 'var(--radius-md)', 
+                                                                        padding: 'var(--spacing-lg)', 
+                                                                        textAlign: 'center' 
+                                                                    }}>
+                                                                        <Loader2 size={24} className="spin" />
+                                                                        <p className="text-xs text-muted mt-sm">İşleniyor...</p>
+                                                                    </div>
+                                                                )}
+                                                                <p className="text-xs text-muted text-center mt-xs">{key.replace(/_/g, ' ')}</p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Instagram İçeriği */}
+                                            {campaignResult.instagram?.reel && (
+                                                <div>
+                                                    <h4 style={{ marginBottom: 'var(--spacing-md)', fontWeight: 600 }}>📱 Instagram İçeriği</h4>
+                                                    <div style={{ background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', padding: 'var(--spacing-md)' }}>
+                                                        <p className="text-sm" style={{ marginBottom: 'var(--spacing-sm)' }}><strong>Caption:</strong></p>
+                                                        <p className="text-sm" style={{ whiteSpace: 'pre-wrap', marginBottom: 'var(--spacing-md)' }}>{campaignResult.instagram.reel.caption}</p>
+                                                        <p className="text-xs text-muted">{campaignResult.instagram.reel.hashtags}</p>
+                                                        <p className="text-xs text-muted mt-sm">🕐 {campaignResult.instagram.reel.best_posting_time}</p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <div style={{ 
+                                            background: 'rgba(239, 68, 68, 0.1)',
+                                            borderRadius: 'var(--radius-lg)',
+                                            padding: 'var(--spacing-xl)',
+                                            textAlign: 'center'
+                                        }}>
+                                            <AlertCircle size={48} color="var(--error)" style={{ marginBottom: 'var(--spacing-md)' }} />
+                                            <p style={{ fontWeight: 600, color: 'var(--error)', marginBottom: 'var(--spacing-sm)' }}>Kampanya Oluşturulamadı</p>
+                                            <p className="text-sm text-muted">{campaignResult.error}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="modal-footer" style={{ borderTop: '1px solid var(--border-color)', paddingTop: 'var(--spacing-md)' }}>
+                            {!campaignResult ? (
+                                <>
+                                    <button 
+                                        className="btn btn-secondary" 
+                                        onClick={() => setShowAdCampaignModal(false)}
+                                        disabled={isCreatingCampaign}
+                                    >
+                                        İptal
+                                    </button>
+                                    <button 
+                                        className="btn btn-primary"
+                                        onClick={handleCreateAdCampaign}
+                                        disabled={isCreatingCampaign || !adCampaign.product_name.trim() || !adCampaign.product_description.trim()}
+                                        style={{ 
+                                            background: 'linear-gradient(135deg, #f43f5e 0%, #ec4899 100%)',
+                                            minWidth: '180px'
+                                        }}
+                                    >
+                                        {isCreatingCampaign ? (
+                                            <>
+                                                <Loader2 size={18} className="spin" />
+                                                <span>Oluşturuluyor...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Send size={18} />
+                                                <span>Kampanya Oluştur</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <button 
+                                        className="btn btn-secondary" 
+                                        onClick={() => {
+                                            setCampaignResult(null);
+                                        }}
+                                    >
+                                        Yeni Kampanya
+                                    </button>
+                                    <button 
+                                        className="btn btn-primary"
+                                        onClick={() => setShowAdCampaignModal(false)}
+                                    >
+                                        Kapat
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* API Key Modal */}
             {showApiKeyModal && (
