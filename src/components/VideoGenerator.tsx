@@ -19,14 +19,17 @@ import {
     Film,
 } from 'lucide-react';
 import { ltxVideoService } from '../utils/ltxVideoService';
+import { higgsfieldService } from '../utils/higgsfieldService';
 import type { VideoGenerationRequest, VideoGenerationResponse } from '../utils/ltxVideoService';
 import { useDashboard } from '../context/DashboardContext';
 
 type GenerationMode = 'text-to-video' | 'image-to-video';
+type VideoProvider = 'kling' | 'higgsfield';
 
 const VideoGenerator: React.FC = () => {
     const { addNotification } = useDashboard();
 
+    const [provider, setProvider] = useState<VideoProvider>('kling');
     const [mode, setMode] = useState<GenerationMode>('text-to-video');
     const [prompt, setPrompt] = useState('');
     const [negativePrompt, setNegativePrompt] = useState('');
@@ -91,7 +94,11 @@ const VideoGenerator: React.FC = () => {
             return;
         }
 
-        if (!ltxVideoService.isConfigured()) {
+        const isConfigured = provider === 'kling' 
+            ? ltxVideoService.isConfigured() 
+            : higgsfieldService.isConfigured();
+
+        if (!isConfigured) {
             setShowApiKeyModal(true);
             return;
         }
@@ -111,15 +118,25 @@ const VideoGenerator: React.FC = () => {
 
         let response: VideoGenerationResponse;
 
-        if (mode === 'text-to-video') {
-            response = await ltxVideoService.generateFromText(request);
-        } else {
-            if (!imageUrl) {
-                addNotification({ type: 'error', message: 'Görsel URL\'si gerekli', read: false });
-                setIsGenerating(false);
-                return;
+        if (provider === 'kling') {
+            if (mode === 'text-to-video') {
+                response = await ltxVideoService.generateFromText(request);
+            } else {
+                if (!imageUrl) {
+                    addNotification({ type: 'error', message: 'Görsel URL\'si gerekli', read: false });
+                    setIsGenerating(false);
+                    return;
+                }
+                response = await ltxVideoService.generateFromImage(request);
             }
-            response = await ltxVideoService.generateFromImage(request);
+        } else {
+            // Higgsfield
+            response = await higgsfieldService.generateVideo({
+                prompt,
+                imageUrl: mode === 'image-to-video' ? imageUrl : undefined,
+                aspectRatio,
+                model: 'dop-preview'
+            });
         }
 
         setIsGenerating(false);
@@ -131,10 +148,14 @@ const VideoGenerator: React.FC = () => {
         } else {
             addNotification({ type: 'error', message: `❌ ${response.error}`, read: false });
         }
-    }, [prompt, negativePrompt, duration, aspectRatio, quality, mode, imageUrl, addNotification]);
+    }, [prompt, negativePrompt, duration, aspectRatio, quality, mode, imageUrl, addNotification, provider]);
 
     const saveApiKey = () => {
-        ltxVideoService.setApiKey(apiKey);
+        if (provider === 'kling') {
+            ltxVideoService.setApiKey(apiKey);
+        } else {
+            higgsfieldService.setApiKey(apiKey);
+        }
         setShowApiKeyModal(false);
         addNotification({ type: 'success', message: 'API anahtarı kaydedildi', read: false });
     };
@@ -154,9 +175,13 @@ const VideoGenerator: React.FC = () => {
                 <div>
                     <h2 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
                         <Video size={24} style={{ color: 'var(--accent-primary)' }} />
-                        Kling AI Video Üretici
+                        {provider === 'kling' ? 'Kling AI Video Üretici' : 'Higgsfield AI Video Üretici'}
                     </h2>
-                    <p className="text-muted text-sm">Fal.ai Kling modelleri ile sinematik AI videolar oluşturun</p>
+                    <p className="text-muted text-sm">
+                        {provider === 'kling' 
+                            ? 'Fal.ai Kling modelleri ile sinematik AI videolar oluşturun' 
+                            : 'Higgsfield DoP modelleri ile yüksek estetikli AI videolar oluşturun'}
+                    </p>
                 </div>
                 <button
                     className="btn btn-ghost btn-icon"
@@ -170,6 +195,24 @@ const VideoGenerator: React.FC = () => {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: 'var(--spacing-xl)' }}>
                 {/* Main Generation Panel */}
                 <div className="card" style={{ padding: 'var(--spacing-xl)' }}>
+                    {/* Provider Toggle */}
+                    <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-lg)', borderBottom: '1px solid var(--border-color)', paddingBottom: 'var(--spacing-md)' }}>
+                        <button
+                            className={`btn ${provider === 'kling' ? 'btn-primary' : 'btn-ghost'}`}
+                            onClick={() => setProvider('kling')}
+                            style={{ flex: 1 }}
+                        >
+                            <span>Kling AI</span>
+                        </button>
+                        <button
+                            className={`btn ${provider === 'higgsfield' ? 'btn-primary' : 'btn-ghost'}`}
+                            onClick={() => setProvider('higgsfield')}
+                            style={{ flex: 1 }}
+                        >
+                            <span>Higgsfield</span>
+                        </button>
+                    </div>
+
                     {/* Mode Tabs */}
                     <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginBottom: 'var(--spacing-lg)' }}>
                         <button
@@ -548,22 +591,36 @@ const VideoGenerator: React.FC = () => {
                 <div className="modal-overlay" onClick={() => setShowApiKeyModal(false)}>
                     <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px' }}>
                         <div className="modal-header">
-                            <h2 className="modal-title">fal.ai API Ayarları</h2>
+                            <h2 className="modal-title">
+                                {provider === 'kling' ? 'fal.ai' : 'Higgsfield'} API Ayarları
+                            </h2>
                         </div>
                         <div className="modal-body">
                             <p className="text-sm text-muted" style={{ marginBottom: 'var(--spacing-md)' }}>
-                                Kling AI video üretimi için fal.ai API anahtarı gereklidir.
-                                <a href="https://fal.ai/dashboard/keys" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)' }}>
-                                    {' '}Buradan{' '}
-                                </a>
-                                API anahtarı alabilirsiniz.
+                                {provider === 'kling' ? (
+                                    <>
+                                        Kling AI video üretimi için fal.ai API anahtarı gereklidir.
+                                        <a href="https://fal.ai/dashboard/keys" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)' }}>
+                                            {' '}Buradan{' '}
+                                        </a>
+                                        API anahtarı alabilirsiniz.
+                                    </>
+                                ) : (
+                                    <>
+                                        Higgsfield video üretimi için API anahtarı gereklidir.
+                                        <a href="https://platform.higgsfield.ai/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)' }}>
+                                            {' '}Buradan{' '}
+                                        </a>
+                                        API anahtarı alabilirsiniz.
+                                    </>
+                                )}
                             </p>
                             <div className="input-group">
                                 <label className="input-label">API Anahtarı</label>
                                 <input
                                     type="password"
                                     className="input"
-                                    placeholder="fal-xxxx..."
+                                    placeholder={provider === 'kling' ? 'fal-xxxx...' : 'ID:SECRET...'}
                                     value={apiKey}
                                     onChange={(e) => setApiKey(e.target.value)}
                                 />
