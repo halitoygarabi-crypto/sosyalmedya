@@ -6,8 +6,9 @@
 export interface HiggsfieldGenerationRequest {
     prompt: string;
     imageUrl?: string;
-    model?: 'dop-lite' | 'dop-preview' | 'dop-turbo';
+    model?: string;
     aspectRatio?: '16:9' | '9:16' | '1:1' | '4:3';
+    negativePrompt?: string;
 }
 
 export interface HiggsfieldGenerationResponse {
@@ -140,6 +141,58 @@ class HiggsfieldService {
             error: 'Zaman aşımı: Video üretimi çok uzun sürdü.',
             requestId
         };
+    }
+
+    /**
+     * Generate image using Higgsfield AI
+     */
+    async generateImage(request: HiggsfieldGenerationRequest): Promise<HiggsfieldGenerationResponse> {
+        const apiKey = this.getApiKey();
+        if (!apiKey) {
+            return { success: false, error: 'Higgsfield API anahtarı bulunamadı. Lütfen .env dosyasını kontrol edin.' };
+        }
+
+        try {
+            console.log('🎨 Higgsfield Görsel üretimi başlatılıyor...');
+            
+            const response = await fetch(`${this.baseUrl}/subscribe`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Key ${apiKey}`,
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'sosyal-medya-dashboard/1.0'
+                },
+                body: JSON.stringify({
+                    endpoint: request.model || 'flux-pro/kontext/max/text-to-image',
+                    input: {
+                        prompt: request.prompt,
+                        aspect_ratio: request.aspectRatio || '1:1',
+                        negative_prompt: request.negativePrompt
+                    }
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || `API hatası: ${response.status}`);
+            }
+
+            const data = await response.json();
+            const requestId = data.id || data.request_id;
+
+            if (!requestId) {
+                throw new Error('İstek ID\'si alınamadı');
+            }
+
+            return await this.pollStatus(requestId);
+        } catch (error: unknown) {
+            console.error('❌ Higgsfield görsel üretim hatası:', error);
+            const errorMessage = error instanceof Error ? error.message : 'Görsel üretilemedi';
+            return {
+                success: false,
+                error: errorMessage,
+            };
+        }
     }
 
     isConfigured(): boolean {

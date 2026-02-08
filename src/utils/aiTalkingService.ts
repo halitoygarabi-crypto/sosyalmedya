@@ -35,7 +35,7 @@ class AITalkingService {
 
     /**
      * Generate a talking video from an image and script
-     * Uses fal-ai/multi-talk or similar
+     * Uses fal-ai/multi-talk for text-to-speech avatar generation
      */
     async generateTalkingVideo(request: TalkingInfluencerRequest): Promise<TalkingInfluencerResponse> {
         const apiKey = this.getApiKey();
@@ -44,10 +44,10 @@ class AITalkingService {
         }
 
         try {
-            console.log('🗣️ AI Influencer konuşturuluyor (Kling AI - standard/ai-avatar)...');
+            console.log('🗣️ AI Influencer konuşturuluyor (MultiTalk)...');
             
-            // Using fal-ai/kling-video/v1/standard/ai-avatar which takes image_url, text_input, voice and prompt
-            const response = await fetch(`${this.baseUrl}/fal-ai/kling-video/v1/standard/ai-avatar`, {
+            // Using fal-ai/multi-talk which takes image_url, text, and optional voice settings
+            const response = await fetch(`${this.baseUrl}/fal-ai/multi-talk`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Key ${apiKey}`,
@@ -55,23 +55,26 @@ class AITalkingService {
                 },
                 body: JSON.stringify({
                     image_url: request.imageUrl,
-                    text_input: request.script,
-                    voice: request.voiceId || 'Sarah', // Default to Sarah if not specified
-                    prompt: 'high quality professional talking head video, realistic skin, stable movement',
+                    text: request.script,
+                    voice: request.voiceId || 'Sarah',
                 }),
             });
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 console.error('API Hatası Detayı:', errorData);
+                
+                // If multi-talk fails, try sadtalker as fallback (requires audio file)
+                // For now, just return the error
                 throw new Error(errorData.detail || errorData.message || `API hatası: ${response.status}`);
             }
 
             const data = await response.json();
+            console.log('✅ MultiTalk yanıtı:', data);
             
             return {
                 success: true,
-                videoUrl: data.video?.url || data.url,
+                videoUrl: data.video?.url || data.video_url || data.url,
                 requestId: data.request_id
             };
         } catch (error: unknown) {

@@ -20,12 +20,14 @@ import {
 import { aiInfluencerService } from '../utils/aiInfluencerService';
 import { aiTalkingService } from '../utils/aiTalkingService';
 import { ltxVideoService } from '../utils/ltxVideoService';
+import { higgsfieldService } from '../utils/higgsfieldService';
 import type { InfluencerGenerationRequest, InfluencerGenerationResponse } from '../utils/aiInfluencerService';
 import { useDashboard } from '../context/DashboardContext';
 
 const AIInfluencerGenerator: React.FC = () => {
     const { addNotification } = useDashboard();
 
+    const [provider, setProvider] = useState<'fal' | 'higgsfield'>('fal');
     const [prompt, setPrompt] = useState('');
     const [aspectRatio, setAspectRatio] = useState<'1:1' | '16:9' | '9:16' | '4:3'>('1:1');
     const [model, setModel] = useState<'flux-pro' | 'flux-schnell'>('flux-schnell');
@@ -62,7 +64,11 @@ const AIInfluencerGenerator: React.FC = () => {
             return;
         }
 
-        if (!aiInfluencerService.isConfigured()) {
+        const isConfigured = provider === 'fal' 
+            ? aiInfluencerService.isConfigured() 
+            : higgsfieldService.isConfigured();
+
+        if (!isConfigured) {
             setShowApiKeyModal(true);
             return;
         }
@@ -71,13 +77,29 @@ const AIInfluencerGenerator: React.FC = () => {
         setResult(null);
         addNotification({ type: 'info', message: '📸 AI Influencer görseli üretiliyor...', read: false });
 
-        const request: InfluencerGenerationRequest = {
-            prompt,
-            aspectRatio,
-            model,
-        };
+        let response: InfluencerGenerationResponse;
 
-        const response = await aiInfluencerService.generateInfluencer(request);
+        if (provider === 'fal') {
+            const request: InfluencerGenerationRequest = {
+                prompt,
+                aspectRatio,
+                model,
+            };
+            response = await aiInfluencerService.generateInfluencer(request);
+        } else {
+            // Higgsfield
+            const higgsResponse = await higgsfieldService.generateImage({
+                prompt,
+                aspectRatio,
+            });
+            
+            response = {
+                success: higgsResponse.success,
+                imageUrl: higgsResponse.videoUrl, // In Higgsfield response, the URL is in videoUrl even for images
+                error: higgsResponse.error,
+                requestId: higgsResponse.requestId
+            };
+        }
 
         setIsGenerating(false);
         setResult(response);
@@ -88,7 +110,7 @@ const AIInfluencerGenerator: React.FC = () => {
         } else {
             addNotification({ type: 'error', message: `❌ ${response.error}`, read: false });
         }
-    }, [prompt, aspectRatio, model, addNotification]);
+    }, [prompt, aspectRatio, model, addNotification, provider]);
 
     const handleAnimate = useCallback(async () => {
         if (!result?.imageUrl) return;
@@ -138,7 +160,10 @@ const AIInfluencerGenerator: React.FC = () => {
                 </div>
                 <button
                     className="btn btn-ghost btn-icon"
-                    onClick={() => setShowApiKeyModal(true)}
+                    onClick={() => {
+                        setApiKey(provider === 'fal' ? aiInfluencerService.getApiKey() : higgsfieldService.getApiKey());
+                        setShowApiKeyModal(true);
+                    }}
                     title="API Ayarları"
                 >
                     <Settings size={20} />
@@ -148,6 +173,26 @@ const AIInfluencerGenerator: React.FC = () => {
             <div style={{ display: 'grid', gridTemplateColumns: '350px 1fr 320px', gap: 'var(--spacing-xl)', alignItems: 'start' }}>
                 {/* Column 1: Configuration & Settings */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)' }}>
+                    {/* Provider Toggle */}
+                    <div className="card" style={{ padding: 'var(--spacing-md)' }}>
+                        <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+                            <button
+                                className={`btn ${provider === 'fal' ? 'btn-primary' : 'btn-ghost'}`}
+                                onClick={() => setProvider('fal')}
+                                style={{ flex: 1, fontSize: '0.8rem' }}
+                            >
+                                <span>fal.ai (Flux)</span>
+                            </button>
+                            <button
+                                className={`btn ${provider === 'higgsfield' ? 'btn-primary' : 'btn-ghost'}`}
+                                onClick={() => setProvider('higgsfield')}
+                                style={{ flex: 1, fontSize: '0.8rem' }}
+                            >
+                                <span>Higgsfield</span>
+                            </button>
+                        </div>
+                    </div>
+
                     {/* Persona Settings */}
                     <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
                         <h3 className="card-title" style={{ marginBottom: 'var(--spacing-lg)', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -270,9 +315,16 @@ const AIInfluencerGenerator: React.FC = () => {
                                     className="input select"
                                     value={model}
                                     onChange={(e) => setModel(e.target.value as 'flux-pro' | 'flux-schnell')}
+                                    disabled={provider === 'higgsfield'}
                                 >
-                                    <option value="flux-schnell">Hızlı (Schnell)</option>
-                                    <option value="flux-pro">Ultra Kalite (Pro)</option>
+                                    {provider === 'fal' ? (
+                                        <>
+                                            <option value="flux-schnell">Hızlı (Schnell)</option>
+                                            <option value="flux-pro">Ultra Kalite (Pro)</option>
+                                        </>
+                                    ) : (
+                                        <option value="flux-pro">Higgsfield Soul</option>
+                                    )}
                                 </select>
                             </div>
                         </div>
@@ -495,22 +547,36 @@ const AIInfluencerGenerator: React.FC = () => {
                 <div className="modal-overlay" onClick={() => setShowApiKeyModal(false)}>
                     <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px' }}>
                         <div className="modal-header">
-                            <h2 className="modal-title">fal.ai API Ayarları</h2>
+                            <h2 className="modal-title">
+                                {provider === 'fal' ? 'fal.ai' : 'Higgsfield'} API Ayarları
+                            </h2>
                         </div>
                         <div className="modal-body">
                             <p className="text-sm text-muted" style={{ marginBottom: 'var(--spacing-md)' }}>
-                                AI Influencer ve Video üretimi için fal.ai API anahtarı gereklidir.
-                                <a href="https://fal.ai/dashboard/keys" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)' }}>
-                                    {' '}Buradan{' '}
-                                </a>
-                                yeni bir API anahtarı alabilirsiniz.
+                                {provider === 'fal' ? (
+                                    <>
+                                        AI Influencer ve Video üretimi için fal.ai API anahtarı gereklidir.
+                                        <a href="https://fal.ai/dashboard/keys" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)' }}>
+                                            {' '}Buradan{' '}
+                                        </a>
+                                        yeni bir API anahtarı alabilirsiniz.
+                                    </>
+                                ) : (
+                                    <>
+                                        Higgsfield görsel üretimi için API anahtarı gereklidir.
+                                        <a href="https://platform.higgsfield.ai/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)' }}>
+                                            {' '}Buradan{' '}
+                                        </a>
+                                        API anahtarı alabilirsiniz.
+                                    </>
+                                )}
                             </p>
                             <div className="input-group">
                                 <label className="input-label">API Anahtarı</label>
                                 <input
                                     type="password"
                                     className="input"
-                                    placeholder="Key ID:Key Secret formatında girin"
+                                    placeholder={provider === 'fal' ? 'Key ID:Key Secret formatında' : 'ID:SECRET formatında'}
                                     value={apiKey}
                                     onChange={(e) => setApiKey(e.target.value)}
                                 />
@@ -521,7 +587,11 @@ const AIInfluencerGenerator: React.FC = () => {
                                 İptal
                             </button>
                             <button className="btn btn-primary" onClick={() => {
-                                ltxVideoService.setApiKey(apiKey);
+                                if (provider === 'fal') {
+                                    ltxVideoService.setApiKey(apiKey);
+                                } else {
+                                    higgsfieldService.setApiKey(apiKey);
+                                }
                                 setShowApiKeyModal(false);
                                 addNotification({ type: 'success', message: 'API anahtarı kaydedildi', read: false });
                             }}>
