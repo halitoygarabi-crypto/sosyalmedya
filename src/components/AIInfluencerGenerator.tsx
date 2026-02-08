@@ -48,6 +48,7 @@ const AIInfluencerGenerator: React.FC = () => {
     const [animatedVideo, setAnimatedVideo] = useState<string | null>(null);
     const [script, setScript] = useState('');
     const [history, setHistory] = useState<InfluencerGenerationResponse[]>([]);
+    const [talkingProvider, setTalkingProvider] = useState<'sadtalker' | 'higgsfield'>('sadtalker');
     
     // API Key state
     const [showApiKeyModal, setShowApiKeyModal] = useState(false);
@@ -123,19 +124,29 @@ const AIInfluencerGenerator: React.FC = () => {
         setAnimatedVideo(null);
         addNotification({ type: 'info', message: '🎬 AI Influencer konuşturuluyor...', read: false });
 
-        const response = await aiTalkingService.generateTalkingVideo({
-            imageUrl: result.imageUrl,
-            script: script
-        });
+        let videoResponse;
+        
+        if (talkingProvider === 'sadtalker') {
+            videoResponse = await aiTalkingService.generateTalkingVideo({
+                imageUrl: result.imageUrl,
+                script: script
+            });
+        } else {
+            // Use Higgsfield for image-to-video with the script as motion prompt
+            videoResponse = await higgsfieldService.generateVideo({
+                prompt: script,
+                imageUrl: result.imageUrl,
+            });
+        }
 
         setIsAnimating(false);
-        if (response.success && response.videoUrl) {
-            setAnimatedVideo(response.videoUrl);
+        if (videoResponse.success && videoResponse.videoUrl) {
+            setAnimatedVideo(videoResponse.videoUrl);
             addNotification({ type: 'success', message: '✅ Video başarıyla oluşturuldu!', read: false });
         } else {
-            addNotification({ type: 'error', message: `❌ ${response.error}`, read: false });
+            addNotification({ type: 'error', message: `❌ ${videoResponse.error}`, read: false });
         }
-    }, [result, script, addNotification]);
+    }, [result, script, addNotification, talkingProvider]);
 
     const personaTemplates = [
         { name: 'Moda İkonu', style: 'fashion influencer wearing elegant designer clothes', location: 'Milan street' },
@@ -483,7 +494,26 @@ const AIInfluencerGenerator: React.FC = () => {
                             </h3>
                             <p className="text-xs text-muted mb-md">Seçili influencer görselini videoya dönüştürün ve konuşturun.</p>
                             
+                            {/* Video Provider Selector */}
+                            <div style={{ display: 'flex', gap: 'var(--spacing-xs)', marginBottom: 'var(--spacing-md)' }}>
+                                <button
+                                    className={`btn btn-sm ${talkingProvider === 'sadtalker' ? 'btn-primary' : 'btn-ghost'}`}
+                                    onClick={() => setTalkingProvider('sadtalker')}
+                                    style={{ flex: 1, fontSize: '0.7rem' }}
+                                >
+                                    SadTalker
+                                </button>
+                                <button
+                                    className={`btn btn-sm ${talkingProvider === 'higgsfield' ? 'btn-primary' : 'btn-ghost'}`}
+                                    onClick={() => setTalkingProvider('higgsfield')}
+                                    style={{ flex: 1, fontSize: '0.7rem' }}
+                                >
+                                    Higgsfield
+                                </button>
+                            </div>
+                            
                             <div className="input-group" style={{ marginBottom: 'var(--spacing-lg)' }}>
+
                                 <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                     <MessageSquare size={14} />
                                     Konuşma Metni (Script)

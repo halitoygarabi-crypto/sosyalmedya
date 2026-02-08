@@ -1,6 +1,7 @@
 /**
  * Higgsfield AI Video Generation Service
- * Uses Higgsfield v2 API for high-aesthetic video generation
+ * Uses fal.ai API for Flux and video generation
+ * Note: Uses fal.ai as the backend provider
  */
 
 export interface HiggsfieldGenerationRequest {
@@ -19,68 +20,79 @@ export interface HiggsfieldGenerationResponse {
 }
 
 class HiggsfieldService {
-    private baseUrl: string = 'https://api.higgsfield.ai/v2';
+    // Use fal.ai as the backend
+    private baseUrl: string = 'https://fal.run';
+    private queueUrl: string = 'https://queue.fal.run';
 
     setApiKey(key: string) {
         localStorage.setItem('higgsfield_api_key', key);
     }
 
     getApiKey(): string {
+        // First check Higgsfield key
         const localKey = localStorage.getItem('higgsfield_api_key');
         if (localKey && localKey.trim()) {
             return localKey.trim();
         }
 
-        const envKey = import.meta.env.VITE_HIGGSFIELD_API_KEY;
+        // Fall back to fal.ai key
+        const falKey = localStorage.getItem('ltx_api_key');
+        if (falKey && falKey.trim()) {
+            return falKey.trim();
+        }
+
+        const envKey = import.meta.env.VITE_HIGGSFIELD_API_KEY || import.meta.env.VITE_FAL_API_KEY;
         return envKey || '';
     }
 
     /**
-     * Generate video using Higgsfield DoP (Director of Photography) model
+     * Generate video using fal.ai Kling Video model (image-to-video)
      */
     async generateVideo(request: HiggsfieldGenerationRequest): Promise<HiggsfieldGenerationResponse> {
         const apiKey = this.getApiKey();
         if (!apiKey) {
-            return { success: false, error: 'Higgsfield API anahtarı bulunamadı. Lütfen .env dosyasını kontrol edin.' };
+            return { success: false, error: 'API anahtarı bulunamadı. Lütfen fal.ai API anahtarınızı girin.' };
         }
 
         try {
-            console.log('🎬 Higgsfield Video üretimi başlatılıyor...');
+            console.log('🎬 Video üretimi başlatılıyor (Kling i2v)...');
             
-            // Initiate the subscription/generation
-            const response = await fetch(`${this.baseUrl}/subscribe`, {
+            // Use Kling image-to-video for video generation
+            const response = await fetch(`${this.queueUrl}/fal-ai/kling-video/v1.6/standard/image-to-video`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Key ${apiKey}`,
                     'Content-Type': 'application/json',
-                    'User-Agent': 'sosyal-medya-dashboard/1.0'
                 },
                 body: JSON.stringify({
-                    endpoint: request.model || 'dop-preview',
-                    input: {
-                        prompt: request.prompt,
-                        image: request.imageUrl,
-                        aspect_ratio: request.aspectRatio || '16:9',
-                    }
+                    prompt: request.prompt,
+                    image_url: request.imageUrl,
+                    duration: '5',
+                    aspect_ratio: request.aspectRatio || '16:9',
                 }),
             });
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || `API hatası: ${response.status}`);
+                console.error('Video API Error:', errorData);
+                throw new Error(errorData.detail || errorData.message || `API hatası: ${response.status}`);
             }
 
             const data = await response.json();
-            const requestId = data.id || data.request_id;
+            const requestId = data.request_id;
 
             if (!requestId) {
-                throw new Error('İstek ID\'si alınamadı');
+                // Synchronous response
+                return {
+                    success: true,
+                    videoUrl: data.video?.url || data.url,
+                };
             }
 
-            // Start polling for status
-            return await this.pollStatus(requestId);
+            // Poll for result
+            return await this.pollStatus(requestId, 'fal-ai/kling-video/v1.6/standard/image-to-video');
         } catch (error: unknown) {
-            console.error('❌ Higgsfield üretim hatası:', error);
+            console.error('❌ Video üretim hatası:', error);
             const errorMessage = error instanceof Error ? error.message : 'Video üretilemedi';
             return {
                 success: false,
@@ -92,34 +104,48 @@ class HiggsfieldService {
     /**
      * Poll the status of a request until it's completed or fails
      */
-    private async pollStatus(requestId: string, maxAttempts = 60): Promise<HiggsfieldGenerationResponse> {
+    private async pollStatus(requestId: string, endpoint: string, maxAttempts = 60): Promise<HiggsfieldGenerationResponse> {
         const apiKey = this.getApiKey();
         let attempts = 0;
 
         while (attempts < maxAttempts) {
             try {
-                const response = await fetch(`${this.baseUrl}/requests/${requestId}/status`, {
+                const response = await fetch(`${this.queueUrl}/${endpoint}/requests/${requestId}/status`, {
                     headers: {
                         'Authorization': `Key ${apiKey}`,
                     }
                 });
 
                 if (!response.ok) {
-                    throw new Error(`Durum kontrolü hatası: ${response.status}`);
+                    console.log(`Status check failed: ${response.status}`);
+                    attempts++;
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                    continue;
                 }
 
                 const data = await response.json();
                 const status = data.status;
+                console.log(`📊 Status (${attempts + 1}/${maxAttempts}):`, status);
 
-                if (status === 'completed' || status === 'success') {
-                    return {
-                        success: true,
-                        videoUrl: data.outputs?.[0]?.url || data.url,
-                        requestId
-                    };
+                if (status === 'COMPLETED') {
+                    // Get the result
+                    const resultResponse = await fetch(`${this.queueUrl}/${endpoint}/requests/${requestId}`, {
+                        headers: {
+                            'Authorization': `Key ${apiKey}`,
+                        }
+                    });
+                    
+                    if (resultResponse.ok) {
+                        const resultData = await resultResponse.json();
+                        return {
+                            success: true,
+                            videoUrl: resultData.video?.url || resultData.url,
+                            requestId
+                        };
+                    }
                 }
 
-                if (status === 'failed' || status === 'error') {
+                if (status === 'FAILED') {
                     return {
                         success: false,
                         error: data.error || 'Video üretimi başarısız oldu',
@@ -131,8 +157,9 @@ class HiggsfieldService {
                 await new Promise(resolve => setTimeout(resolve, 5000));
                 attempts++;
             } catch (error) {
-                console.error('Anlık durum kontrolü hatası:', error);
+                console.error('Status check error:', error);
                 attempts++;
+                await new Promise(resolve => setTimeout(resolve, 5000));
             }
         }
 
@@ -144,55 +171,65 @@ class HiggsfieldService {
     }
 
     /**
-     * Generate image using Higgsfield AI
+     * Generate image using fal.ai Flux Pro model
      */
     async generateImage(request: HiggsfieldGenerationRequest): Promise<HiggsfieldGenerationResponse> {
         const apiKey = this.getApiKey();
         if (!apiKey) {
-            return { success: false, error: 'Higgsfield API anahtarı bulunamadı. Lütfen .env dosyasını kontrol edin.' };
+            return { success: false, error: 'API anahtarı bulunamadı. Lütfen fal.ai API anahtarınızı girin.' };
         }
 
         try {
-            console.log('🎨 Higgsfield Görsel üretimi başlatılıyor...');
+            console.log('🎨 Görsel üretimi başlatılıyor (Flux Pro)...');
             
-            const response = await fetch(`${this.baseUrl}/subscribe`, {
+            // Use Flux Pro for image generation
+            const response = await fetch(`${this.baseUrl}/fal-ai/flux-pro`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Key ${apiKey}`,
                     'Content-Type': 'application/json',
-                    'User-Agent': 'sosyal-medya-dashboard/1.0'
                 },
                 body: JSON.stringify({
-                    endpoint: request.model || 'flux-pro/kontext/max/text-to-image',
-                    input: {
-                        prompt: request.prompt,
-                        aspect_ratio: request.aspectRatio || '1:1',
-                        negative_prompt: request.negativePrompt
-                    }
+                    prompt: request.prompt,
+                    image_size: this.mapAspectRatio(request.aspectRatio || '1:1'),
+                    num_inference_steps: 28,
+                    seed: Math.floor(Math.random() * 1000000),
+                    enable_safety_checker: true,
                 }),
             });
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || `API hatası: ${response.status}`);
+                console.error('Image API Error:', errorData);
+                throw new Error(errorData.detail || errorData.message || `API hatası: ${response.status}`);
             }
 
             const data = await response.json();
-            const requestId = data.id || data.request_id;
-
-            if (!requestId) {
-                throw new Error('İstek ID\'si alınamadı');
-            }
-
-            return await this.pollStatus(requestId);
+            console.log('✅ Image generated:', data);
+            
+            return {
+                success: true,
+                videoUrl: data.images?.[0]?.url || data.url, // Using videoUrl field for consistency
+                requestId: data.request_id
+            };
         } catch (error: unknown) {
-            console.error('❌ Higgsfield görsel üretim hatası:', error);
+            console.error('❌ Görsel üretim hatası:', error);
             const errorMessage = error instanceof Error ? error.message : 'Görsel üretilemedi';
             return {
                 success: false,
                 error: errorMessage,
             };
         }
+    }
+
+    private mapAspectRatio(ratio: string): string {
+        const ratioMap: Record<string, string> = {
+            '1:1': 'square_hd',
+            '16:9': 'landscape_16_9',
+            '9:16': 'portrait_16_9',
+            '4:3': 'landscape_4_3'
+        };
+        return ratioMap[ratio] || 'square_hd';
     }
 
     isConfigured(): boolean {
