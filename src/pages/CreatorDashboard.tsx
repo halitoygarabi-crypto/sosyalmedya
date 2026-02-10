@@ -55,12 +55,11 @@ const CreatorSidebar: React.FC<{
     const { isDarkMode, toggleDarkMode } = useDashboard();
 
     const navItems = [
-        { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-        { id: 'content', label: 'İçerik Oluştur', icon: <FileText size={18} /> },
-        { id: 'calendar', label: 'İçerik Takvimi', icon: <Calendar size={18} /> },
-        { id: 'brand-guide', label: 'Marka Rehberi', icon: <BookOpen size={18} /> },
-        { id: 'video-generator', label: 'Video Üretici', icon: <Video size={18} /> },
-        { id: 'ai-influencer', label: 'AI Influencer', icon: <Users size={18} /> },
+        { id: 'dashboard', label: 'Genel Bakış', icon: <LayoutDashboard size={18} /> },
+        { id: 'creative-studio', label: 'Yaratıcı Stüdyo', icon: <Sparkles size={18} /> },
+        { id: 'calendar', label: 'Takvim', icon: <Calendar size={18} /> },
+        { id: 'content', label: 'İçerik Arşivi', icon: <FileText size={18} /> },
+        { id: 'brand-guide', label: 'Marka', icon: <BookOpen size={18} /> },
     ];
 
     return (
@@ -71,7 +70,7 @@ const CreatorSidebar: React.FC<{
                         width: '36px',
                         height: '36px',
                         borderRadius: '10px',
-                        background: 'linear-gradient(135deg, #7C3AED, #A855F7)',
+                        background: 'var(--accent-primary)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -109,7 +108,7 @@ const CreatorSidebar: React.FC<{
                                     border: 'none',
                                     cursor: 'pointer',
                                     background: selectedClient?.id === client.id
-                                        ? 'linear-gradient(135deg, rgba(124,58,237,0.15), rgba(168,85,247,0.1))'
+                                        ? 'var(--bg-secondary)'
                                         : 'transparent',
                                     color: selectedClient?.id === client.id ? 'var(--accent-primary)' : 'var(--text-secondary)',
                                     fontWeight: selectedClient?.id === client.id ? 600 : 400,
@@ -121,7 +120,7 @@ const CreatorSidebar: React.FC<{
                                 <div style={{
                                     width: '24px', height: '24px', borderRadius: '6px',
                                     background: selectedClient?.id === client.id
-                                        ? 'linear-gradient(135deg, #7C3AED, #A855F7)'
+                                        ? 'var(--accent-primary)'
                                         : 'var(--bg-hover)',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                     color: selectedClient?.id === client.id ? 'white' : 'var(--text-muted)',
@@ -479,6 +478,73 @@ const BrandGuide: React.FC<{ client: AssignedClient }> = ({ client }) => {
     );
 };
 
+// ─── Creative Studio ─────────────────────────────────────────────
+interface CreativeStudioProps {
+    client: AssignedClient;
+    onNewPost: () => void;
+}
+
+const CreativeStudio: React.FC<CreativeStudioProps> = ({ client, onNewPost }) => {
+    const [activeTab, setActiveTab] = useState<'image' | 'video' | 'text'>('image');
+
+    return (
+        <>
+            <div className="section-header">
+                <h2 className="section-title">
+                    <Sparkles size={20} style={{ marginRight: '8px' }} />
+                    Yaratıcı Stüdyo — {client.company_name}
+                </h2>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                        className={`btn btn-sm ${activeTab === 'image' ? 'btn-primary' : 'btn-ghost'}`}
+                        onClick={() => setActiveTab('image')}
+                    >
+                        <Image size={16} /> AI Görsel
+                    </button>
+                    <button
+                        className={`btn btn-sm ${activeTab === 'video' ? 'btn-primary' : 'btn-ghost'}`}
+                        onClick={() => setActiveTab('video')}
+                    >
+                        <Video size={16} /> AI Video
+                    </button>
+                    <button
+                        className={`btn btn-sm ${activeTab === 'text' ? 'btn-primary' : 'btn-ghost'}`}
+                        onClick={() => setActiveTab('text')}
+                    >
+                        <FileText size={16} /> Metin / Post
+                    </button>
+                </div>
+            </div>
+
+            <div className="animate-fadeIn">
+                {activeTab === 'image' && <AIInfluencerGenerator selectedClient={client} />}
+                {activeTab === 'video' && <VideoGenerator selectedClient={client} />}
+                {activeTab === 'text' && (
+                    <div className="card">
+                         <div style={{ textAlign: 'center', padding: 'var(--spacing-2xl)' }}>
+                            <div style={{ 
+                                width: '64px', height: '64px', borderRadius: '50%', 
+                                background: 'var(--bg-tertiary)', color: 'var(--text-muted)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                margin: '0 auto var(--spacing-lg)'
+                            }}>
+                                <FileText size={32} />
+                            </div>
+                            <h3 style={{ marginBottom: 'var(--spacing-sm)' }}>Yeni İçerik Oluştur</h3>
+                            <p className="text-muted" style={{ marginBottom: 'var(--spacing-xl)', maxWidth: '400px', margin: '0 auto var(--spacing-xl)' }}>
+                                Markanız için metin tabanlı veya görsel içerikli yeni bir gönderi hazırlayın.
+                            </p>
+                            <button className="btn btn-primary" onClick={onNewPost}>
+                                <Plus size={18} /> Yeni Post Oluştur
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </>
+    );
+};
+
 // ─── Main Creator Dashboard ──────────────────────────────────────
 const CreatorDashboard: React.FC = () => {
     const { customerProfile } = useAuth();
@@ -611,95 +677,33 @@ const CreatorDashboard: React.FC = () => {
                                 <h2 className="section-title">{selectedClient.company_name} — Genel Bakış</h2>
                             </div>
 
-                            {/* KPI Cards */}
-                            <div className="grid-4" style={{ marginBottom: 'var(--spacing-xl)' }}>
-                                {[
-                                    { label: 'Toplam Post', value: clientPosts.length, icon: <FileText size={20} />, color: '#7C3AED' },
-                                    { label: 'Gönderildi', value: postedCount, icon: <CheckCircle2 size={20} />, color: '#10b981' },
-                                    { label: 'Planlandı', value: scheduledCount, icon: <Clock size={20} />, color: '#6366f1' },
-                                    { label: 'Taslak', value: draftCount, icon: <AlertCircle size={20} />, color: '#f59e0b' },
-                                ].map(kpi => (
-                                    <div className="card" key={kpi.label} style={{ position: 'relative', overflow: 'hidden' }}>
-                                        <div style={{
-                                            position: 'absolute', top: '-10px', right: '-10px',
-                                            width: '60px', height: '60px', borderRadius: '50%',
-                                            background: `${kpi.color}10`,
-                                        }} />
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                            <div>
-                                                <div className="text-muted" style={{ fontSize: '0.75rem', marginBottom: '4px' }}>{kpi.label}</div>
-                                                <div style={{ fontSize: '2rem', fontWeight: 700, color: kpi.color }}>{kpi.value}</div>
-                                            </div>
-                                            <div style={{
-                                                width: '40px', height: '40px', borderRadius: 'var(--radius-md)',
-                                                background: `${kpi.color}15`, color: kpi.color,
-                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            }}>
-                                                {kpi.icon}
-                                            </div>
-                                        </div>
+                            {/* Simplified KPI Cards - 3 Key Metrics */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--spacing-lg)', marginBottom: 'var(--spacing-xl)' }}>
+                                <div className="card" style={{ padding: 'var(--spacing-lg)', display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
+                                    <div style={{ padding: '12px', borderRadius: '50%', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>
+                                        <CheckCircle2 size={24} />
                                     </div>
-                                ))}
-                            </div>
-
-                            {/* Engagement & Platform stats */}
-                            <div className="grid-2" style={{ marginBottom: 'var(--spacing-xl)' }}>
-                                {/* Engagement Summary */}
-                                <div className="card">
-                                    <div className="card-header">
-                                        <h3 className="card-title"><TrendingUp size={16} /> Etkileşim Özeti</h3>
-                                    </div>
-                                    <div style={{ padding: 'var(--spacing-md)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-md)' }}>
-                                        <div style={{ padding: 'var(--spacing-md)', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-                                            <Heart size={20} style={{ color: '#ec4899', marginBottom: '4px' }} />
-                                            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#ec4899' }}>{totalLikes.toLocaleString('tr-TR')}</div>
-                                            <div className="text-muted" style={{ fontSize: '0.7rem' }}>Toplam Beğeni</div>
-                                        </div>
-                                        <div style={{ padding: 'var(--spacing-md)', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-                                            <Eye size={20} style={{ color: '#3b82f6', marginBottom: '4px' }} />
-                                            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#3b82f6' }}>{totalReach.toLocaleString('tr-TR')}</div>
-                                            <div className="text-muted" style={{ fontSize: '0.7rem' }}>Toplam Erişim</div>
-                                        </div>
+                                    <div>
+                                        <div style={{ fontSize: '1.8rem', fontWeight: 700 }}>{postedCount}</div>
+                                        <div className="text-muted">Yayınlanan</div>
                                     </div>
                                 </div>
-
-                                {/* Platform Distribution */}
-                                <div className="card">
-                                    <div className="card-header">
-                                        <h3 className="card-title"><BarChart3 size={16} /> Platform Dağılımı</h3>
+                                <div className="card" style={{ padding: 'var(--spacing-lg)', display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
+                                    <div style={{ padding: '12px', borderRadius: '50%', background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1' }}>
+                                        <Clock size={24} />
                                     </div>
-                                    <div style={{ padding: 'var(--spacing-md)' }}>
-                                        {Object.keys(platformCounts).length === 0 ? (
-                                            <p className="text-muted" style={{ fontSize: '0.875rem', fontStyle: 'italic' }}>Henüz post yok.</p>
-                                        ) : (
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
-                                                {Object.entries(platformCounts)
-                                                    .sort(([, a], [, b]) => b - a)
-                                                    .map(([platform, count]) => {
-                                                        const pctg = clientPosts.length > 0 ? (count / clientPosts.length * 100) : 0;
-                                                        const platformColors: Record<string, string> = {
-                                                            instagram: '#E4405F', twitter: '#1DA1F2', linkedin: '#0A66C2',
-                                                            tiktok: '#00f2ea', facebook: '#1877F2', youtube: '#FF0000',
-                                                        };
-                                                        const color = platformColors[platform] || '#6366f1';
-                                                        return (
-                                                            <div key={platform}>
-                                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '2px' }}>
-                                                                    <span style={{ fontWeight: 600, textTransform: 'capitalize' }}>{platform}</span>
-                                                                    <span className="text-muted">{count} post ({pctg.toFixed(0)}%)</span>
-                                                                </div>
-                                                                <div style={{ height: '6px', background: 'var(--bg-tertiary)', borderRadius: '3px', overflow: 'hidden' }}>
-                                                                    <div style={{
-                                                                        width: `${pctg}%`, height: '100%',
-                                                                        background: color, borderRadius: '3px',
-                                                                        transition: 'width 0.5s ease',
-                                                                    }} />
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                            </div>
-                                        )}
+                                    <div>
+                                        <div style={{ fontSize: '1.8rem', fontWeight: 700 }}>{scheduledCount}</div>
+                                        <div className="text-muted">Bekleyen</div>
+                                    </div>
+                                </div>
+                                <div className="card" style={{ padding: 'var(--spacing-lg)', display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
+                                    <div style={{ padding: '12px', borderRadius: '50%', background: 'rgba(236, 72, 153, 0.1)', color: '#ec4899' }}>
+                                        <Heart size={24} />
+                                    </div>
+                                    <div>
+                                        <div style={{ fontSize: '1.8rem', fontWeight: 700 }}>{totalLikes.toLocaleString('tr-TR')}</div>
+                                        <div className="text-muted">Etkileşim</div>
                                     </div>
                                 </div>
                             </div>
@@ -743,14 +747,9 @@ const CreatorDashboard: React.FC = () => {
                         <BrandGuide client={selectedClient} />
                     )}
 
-                    {/* ── Video Generator ── */}
-                    {activeSection === 'video-generator' && selectedClient && (
-                        <VideoGenerator selectedClient={selectedClient} />
-                    )}
-
-                    {/* ── AI Influencer ── */}
-                    {activeSection === 'ai-influencer' && selectedClient && (
-                        <AIInfluencerGenerator selectedClient={selectedClient} />
+                    {/* ── Creative Studio ── */}
+                    {activeSection === 'creative-studio' && selectedClient && (
+                        <CreativeStudio client={selectedClient} onNewPost={() => setShowNewPostModal(true)} />
                     )}
                 </div>
             </main>
