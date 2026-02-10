@@ -132,7 +132,7 @@ const PostList: React.FC<PostListProps> = ({ filter = 'all', limit, showActions 
                             {(post.status === 'scheduled' || post.status === 'draft') && (
                                 <button
                                     className="btn btn-primary btn-icon btn-sm"
-                                    title="Publer'a Gönder"
+                                    title="LimeSocial'a Gönder"
                                     style={{ width: '28px', height: '28px', background: 'var(--accent-gradient)' }}
                                     onClick={() => publishPost(post)}
                                 >

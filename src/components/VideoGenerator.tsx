@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
     Video,
     Wand2,
@@ -23,10 +23,23 @@ import { higgsfieldService } from '../utils/higgsfieldService';
 import type { VideoGenerationRequest, VideoGenerationResponse } from '../utils/ltxVideoService';
 import { useDashboard } from '../context/DashboardContext';
 
+interface SelectedClient {
+    id: string;
+    company_name: string;
+    industry: string | null;
+    logo_url: string | null;
+    ai_prompt_prefix?: string;
+    brand_guidelines?: string;
+}
+
+interface VideoGeneratorProps {
+    selectedClient?: SelectedClient | null;
+}
+
 type GenerationMode = 'text-to-video' | 'image-to-video';
 type VideoProvider = 'kling' | 'higgsfield';
 
-const VideoGenerator: React.FC = () => {
+const VideoGenerator: React.FC<VideoGeneratorProps> = ({ selectedClient }) => {
     const { addNotification } = useDashboard();
 
     const [provider, setProvider] = useState<VideoProvider>('kling');
@@ -107,8 +120,18 @@ const VideoGenerator: React.FC = () => {
         setResult(null);
         addNotification({ type: 'info', message: '🎬 Video üretimi başlatıldı...', read: false });
 
+        // Build augmented prompt with client context
+        let augmentedPrompt = '';
+        if (selectedClient?.ai_prompt_prefix) {
+            augmentedPrompt += `${selectedClient.ai_prompt_prefix} `;
+        }
+        if (selectedClient?.brand_guidelines) {
+            augmentedPrompt += `[Brand Guidelines: ${selectedClient.brand_guidelines.substring(0, 200)}] `;
+        }
+        augmentedPrompt += prompt;
+
         const request: VideoGenerationRequest = {
-            prompt,
+            prompt: augmentedPrompt,
             negativePrompt,
             duration,
             aspectRatio,
@@ -148,7 +171,7 @@ const VideoGenerator: React.FC = () => {
         } else {
             addNotification({ type: 'error', message: `❌ ${response.error}`, read: false });
         }
-    }, [prompt, negativePrompt, duration, aspectRatio, quality, mode, imageUrl, addNotification, provider]);
+    }, [prompt, negativePrompt, duration, aspectRatio, quality, mode, imageUrl, addNotification, provider, selectedClient]);
 
     const saveApiKey = () => {
         if (provider === 'kling') {

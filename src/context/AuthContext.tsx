@@ -10,6 +10,13 @@ export interface CustomerProfile {
     logo_url: string | null;
     ai_prompt_prefix: string;
     is_admin?: boolean;
+    role?: 'admin' | 'client' | 'content_creator';
+    phone?: string;
+    website?: string;
+    address?: string;
+    social_accounts?: Record<string, string>;
+    brand_guidelines?: string;
+    assigned_clients?: string[];
     created_at: string;
 }
 
@@ -18,6 +25,8 @@ interface AuthContextType {
     session: Session | null;
     customerProfile: CustomerProfile | null;
     isAdmin: boolean;
+    isContentCreator: boolean;
+    userRole: 'admin' | 'client' | 'content_creator';
     isLoading: boolean;
     login: (email: string, password: string) => Promise<{ error: string | null }>;
     register: (email: string, password: string, companyName: string, industry?: string) => Promise<{ error: string | null }>;
@@ -212,11 +221,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     }, [user, fetchCustomerProfile]);
 
+    // Determine role: prefer explicit role field, fall back to is_admin boolean
+    const resolvedRole = customerProfile?.role
+        ?? (customerProfile?.is_admin ? 'admin' : 'client');
+
     const value: AuthContextType = {
         user,
         session,
         customerProfile,
-        isAdmin: !!customerProfile?.is_admin,
+        isAdmin: resolvedRole === 'admin',
+        isContentCreator: resolvedRole === 'content_creator',
+        userRole: resolvedRole,
         isLoading,
         login,
         register,

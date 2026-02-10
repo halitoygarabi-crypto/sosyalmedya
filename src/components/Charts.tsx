@@ -252,7 +252,7 @@ export const ReachTrendChart: React.FC = () => {
 export const FollowerGrowthChart: React.FC = () => {
     // Generate follower growth data for last 30 days
     const data = [];
-    let baseFollowers = { instagram: 120000, twitter: 85000, linkedin: 42000, tiktok: 220000 };
+    const baseFollowers = { instagram: 0, twitter: 0, linkedin: 0, tiktok: 0 };
 
     for (let i = 29; i >= 0; i--) {
         const date = new Date();
@@ -260,16 +260,11 @@ export const FollowerGrowthChart: React.FC = () => {
 
         data.push({
             date: date.toISOString().split('T')[0],
-            instagram: Math.floor(baseFollowers.instagram + Math.random() * 500),
-            twitter: Math.floor(baseFollowers.twitter + Math.random() * 300),
-            linkedin: Math.floor(baseFollowers.linkedin + Math.random() * 150),
-            tiktok: Math.floor(baseFollowers.tiktok + Math.random() * 800),
+            instagram: baseFollowers.instagram,
+            twitter: baseFollowers.twitter,
+            linkedin: baseFollowers.linkedin,
+            tiktok: baseFollowers.tiktok,
         });
-
-        baseFollowers.instagram += Math.random() * 200;
-        baseFollowers.twitter += Math.random() * 100;
-        baseFollowers.linkedin += Math.random() * 50;
-        baseFollowers.tiktok += Math.random() * 300;
     }
 
     return (

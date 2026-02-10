@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DashboardProvider, useDashboard } from './context/DashboardContext';
-import { LoginPage, RegisterPage, ClientDashboard, AdminLoginPage, AdminPage } from './pages';
+import { LoginPage, RegisterPage, ClientDashboard, AdminLoginPage, AdminPage, CreatorDashboard } from './pages';
 import ProtectedRoute from './components/ProtectedRoute';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -436,7 +436,7 @@ const Dashboard: React.FC = () => {
 
 // Role-based redirect component
 const RoleBasedRedirect: React.FC = () => {
-  const { isAdmin, isLoading, customerProfile, user } = useAuth();
+  const { userRole, isLoading, user } = useAuth();
 
   // Still loading auth state
   if (isLoading) {
@@ -453,15 +453,21 @@ const RoleBasedRedirect: React.FC = () => {
     );
   }
 
-  // Not logged in - this shouldn't happen because of ProtectedRoute, but just in case
+  // Not logged in
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
-  console.log('RoleBasedRedirect - isAdmin:', isAdmin, 'profile:', customerProfile?.is_admin);
-
-  // Admin goes to full dashboard, customers go to client dashboard
-  return isAdmin ? <Navigate to="/admin" replace /> : <Navigate to="/client" replace />;
+  // Route based on role
+  switch (userRole) {
+    case 'admin':
+      return <Navigate to="/admin" replace />;
+    case 'content_creator':
+      return <Navigate to="/creator" replace />;
+    case 'client':
+    default:
+      return <Navigate to="/client" replace />;
+  }
 };
 
 // Client Dashboard Wrapper
@@ -469,6 +475,15 @@ const ClientDashboardWrapper: React.FC = () => {
   return (
     <DashboardProvider>
       <ClientDashboard />
+    </DashboardProvider>
+  );
+};
+
+// Creator Dashboard Wrapper
+const CreatorDashboardWrapper: React.FC = () => {
+  return (
+    <DashboardProvider>
+      <CreatorDashboard />
     </DashboardProvider>
   );
 };
@@ -482,8 +497,21 @@ const App: React.FC = () => {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/admin/login" element={<AdminLoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          <Route path="/admin" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/client" element={<ProtectedRoute><ClientDashboardWrapper /></ProtectedRoute>} />
+          <Route path="/admin" element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <Dashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/client" element={
+            <ProtectedRoute allowedRoles={['client']}>
+              <ClientDashboardWrapper />
+            </ProtectedRoute>
+          } />
+          <Route path="/creator" element={
+            <ProtectedRoute allowedRoles={['content_creator', 'admin']}>
+              <CreatorDashboardWrapper />
+            </ProtectedRoute>
+          } />
           <Route
             path="/"
             element={

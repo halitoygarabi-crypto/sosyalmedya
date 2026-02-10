@@ -14,6 +14,7 @@ import {
     Settings,
     Instagram,
     Twitter,
+    Image,
     Linkedin,
     Globe,
     Mail,
@@ -31,24 +32,30 @@ import { useDashboard } from '../context/DashboardContext';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+import { influencerService } from '../utils/influencerService';
+import type { Influencer } from '../types';
+
 interface Customer {
     id: string;
     company_name: string;
     industry: string | null;
     ai_prompt_prefix: string;
     is_admin: boolean;
+    role?: 'admin' | 'client' | 'content_creator';
     created_at: string;
     email?: string;
     phone?: string;
     website?: string;
     address?: string;
     logo_url?: string;
+    brand_guidelines?: string;
+    assigned_clients?: string[];
     instagram_token?: string;
     twitter_token?: string;
     linkedin_token?: string;
     tiktok_token?: string;
     metricool_api_key?: string;
-    publer_api_key?: string;
+    limesocial_api_key?: string;
 }
 
 interface CustomerDetailModalProps {
@@ -60,16 +67,46 @@ interface CustomerDetailModalProps {
 
 // Customer Detail Modal Component
 const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({ customer, isOpen, onClose, onSave }) => {
-    const [activeTab, setActiveTab] = useState<'info' | 'api' | 'settings'>('info');
+    const [activeTab, setActiveTab] = useState<'info' | 'api' | 'influencers' | 'settings'>('info');
     const [isEditing, setIsEditing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [editData, setEditData] = useState<Partial<Customer>>({});
+    const [allInfluencers, setAllInfluencers] = useState<Influencer[]>([]);
+    const [assignedInfluencers, setAssignedInfluencers] = useState<Influencer[]>([]);
+    const [loadingInfluencers, setLoadingInfluencers] = useState(false);
+    const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
 
     useEffect(() => {
         if (customer) {
             setEditData({ ...customer });
         }
     }, [customer]);
+
+    // Fetch influencers when the influencers tab is active
+    useEffect(() => {
+        if (activeTab === 'influencers' && customer) {
+            setLoadingInfluencers(true);
+            Promise.all([
+                influencerService.list(),
+                influencerService.getByClient(customer.id),
+            ]).then(([all, assigned]) => {
+                setAllInfluencers(all);
+                setAssignedInfluencers(assigned);
+                setLoadingInfluencers(false);
+            });
+        }
+    }, [activeTab, customer]);
+
+    // Fetch all customers for content_creator assignment
+    useEffect(() => {
+        if (activeTab === 'settings' && editData.role === 'content_creator') {
+            supabase.from('customer_profiles').select('id, company_name, industry, role')
+                .neq('role', 'content_creator')
+                .then(({ data }) => {
+                    if (data) setAllCustomers(data as Customer[]);
+                });
+        }
+    }, [activeTab, editData.role]);
 
     if (!isOpen || !customer) return null;
 
@@ -83,10 +120,26 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({ customer, isO
         }
     };
 
+    const handleAssignInfluencer = async (influencerId: string) => {
+        const ok = await influencerService.assignToClient(customer.id, influencerId);
+        if (ok) {
+            const inf = allInfluencers.find(i => i.id === influencerId);
+            if (inf) setAssignedInfluencers(prev => [...prev, inf]);
+        }
+    };
+
+    const handleRemoveInfluencer = async (influencerId: string) => {
+        const ok = await influencerService.removeFromClient(customer.id, influencerId);
+        if (ok) {
+            setAssignedInfluencers(prev => prev.filter(i => i.id !== influencerId));
+        }
+    };
+
     const tabs = [
         { id: 'info', label: 'Firma Bilgileri', icon: <Building2 size={16} /> },
         { id: 'api', label: 'API Bağlantıları', icon: <Key size={16} /> },
-        { id: 'settings', label: 'Ayarlar', icon: <Settings size={16} /> },
+        { id: 'influencers', label: 'AI Influencer', icon: <Image size={16} /> },
+        { id: 'settings', label: 'Rol & Ayarlar', icon: <Settings size={16} /> },
     ];
 
     return (
@@ -370,14 +423,14 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({ customer, isO
                                         />
                                     </div>
                                     <div className="input-group">
-                                        <label className="input-label">Publer API Key</label>
+                                        <label className="input-label">LimeSocial API Key</label>
                                         <input
                                             type={isEditing ? "text" : "password"}
                                             className="input"
-                                            value={editData.publer_api_key || ''}
-                                            onChange={e => setEditData({ ...editData, publer_api_key: e.target.value })}
+                                            value={editData.limesocial_api_key || ''}
+                                            onChange={e => setEditData({ ...editData, limesocial_api_key: e.target.value })}
                                             disabled={!isEditing}
-                                            placeholder="Publer API Anahtarı"
+                                            placeholder="LimeSocial API Anahtarı"
                                         />
                                     </div>
                                 </div>
@@ -385,8 +438,87 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({ customer, isO
                         </div>
                     )}
 
+                    {activeTab === 'influencers' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)' }}>
+                            <div style={{ padding: 'var(--spacing-md)', background: 'var(--info-bg)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+                                <AlertCircle size={18} color="var(--info)" />
+                                <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                                    Bu firmaya atanmış AI influencer'ları yönetin. Atanan influencer'lar içerik üretiminde kullanılabilir.
+                                </p>
+                            </div>
+
+                            {loadingInfluencers ? (
+                                <div style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
+                                    <div className="spinner" style={{ margin: '0 auto' }} />
+                                </div>
+                            ) : (
+                                <>
+                                    {/* Assigned Influencers */}
+                                    <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+                                        <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--spacing-md)' }}>
+                                            Atanmış Influencer'lar ({assignedInfluencers.length})
+                                        </h4>
+                                        {assignedInfluencers.length === 0 ? (
+                                            <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Henüz influencer atanmamış.</p>
+                                        ) : (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
+                                                {assignedInfluencers.map(inf => (
+                                                    <div key={inf.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--spacing-sm) var(--spacing-md)', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+                                                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--accent-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '0.7rem' }}>
+                                                                {inf.name.substring(0, 2).toUpperCase()}
+                                                            </div>
+                                                            <div>
+                                                                <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>{inf.name}</div>
+                                                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{inf.style || 'Stil belirtilmemiş'}</div>
+                                                            </div>
+                                                        </div>
+                                                        <button className="btn btn-ghost btn-sm" style={{ color: 'var(--error)' }} onClick={() => handleRemoveInfluencer(inf.id)}>
+                                                            <X size={14} /> Kaldır
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Available Influencers to Assign */}
+                                    {(() => {
+                                        const unassigned = allInfluencers.filter(i => !assignedInfluencers.some(a => a.id === i.id));
+                                        return unassigned.length > 0 ? (
+                                            <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+                                                <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--spacing-md)' }}>
+                                                    Atanabilecek Influencer'lar ({unassigned.length})
+                                                </h4>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
+                                                    {unassigned.map(inf => (
+                                                        <div key={inf.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--spacing-sm) var(--spacing-md)', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+                                                                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontWeight: 700, fontSize: '0.7rem' }}>
+                                                                    {inf.name.substring(0, 2).toUpperCase()}
+                                                                </div>
+                                                                <div>
+                                                                    <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>{inf.name}</div>
+                                                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{inf.personality || 'Kişilik belirtilmemiş'}</div>
+                                                                </div>
+                                                            </div>
+                                                            <button className="btn btn-primary btn-sm" onClick={() => handleAssignInfluencer(inf.id)}>
+                                                                Ata
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ) : null;
+                                    })()}
+                                </>
+                            )}
+                        </div>
+                    )}
+
                     {activeTab === 'settings' && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)' }}>
+                            {/* AI Prompt */}
                             <div className="input-group">
                                 <label className="input-label">AI Prompt Prefix (İçerik Üretimi için)</label>
                                 <textarea
@@ -395,7 +527,7 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({ customer, isO
                                     onChange={e => setEditData({ ...editData, ai_prompt_prefix: e.target.value })}
                                     disabled={!isEditing}
                                     placeholder="Örn: Profesyonel ve samimi bir dil kullan."
-                                    rows={4}
+                                    rows={3}
                                     style={{ resize: 'vertical' }}
                                 />
                                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
@@ -403,24 +535,91 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({ customer, isO
                                 </p>
                             </div>
 
-                            <div className="card" style={{ padding: 'var(--spacing-lg)', background: customer.is_admin ? 'rgba(139, 92, 246, 0.1)' : 'var(--bg-tertiary)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div>
-                                        <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '4px' }}>
-                                            Admin Yetkisi
-                                        </h4>
-                                        <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-                                            {customer.is_admin
-                                                ? 'Bu kullanıcı yönetici paneline erişebilir.'
-                                                : 'Bu kullanıcı standart müşteri yetkilerine sahiptir.'}
-                                        </p>
-                                    </div>
-                                    <div className={`badge ${customer.is_admin ? 'badge-info' : 'badge-neutral'}`} style={customer.is_admin ? { color: '#8b5cf6', background: 'rgba(139, 92, 246, 0.2)' } : {}}>
-                                        {customer.is_admin ? <Shield size={14} /> : null}
-                                        <span>{customer.is_admin ? 'Admin' : 'Standart'}</span>
-                                    </div>
+                            {/* Brand Guidelines */}
+                            <div className="input-group">
+                                <label className="input-label">Marka Kılavuzu</label>
+                                <textarea
+                                    className="input"
+                                    value={editData.brand_guidelines || ''}
+                                    onChange={e => setEditData({ ...editData, brand_guidelines: e.target.value })}
+                                    disabled={!isEditing}
+                                    placeholder="Marka renkleri, ton, stil kuralları..."
+                                    rows={3}
+                                    style={{ resize: 'vertical' }}
+                                />
+                            </div>
+
+                            {/* Role Selector */}
+                            <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+                                <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--spacing-md)' }}>Kullanıcı Rolü</h4>
+                                <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
+                                    {[
+                                        { value: 'client', label: 'Müşteri', desc: 'Kendi paneline ve raporlara erişir', icon: <Building2 size={16} />, color: '#10b981' },
+                                        { value: 'content_creator', label: 'İçerik Üretici', desc: 'Atanmış firmaların içeriklerini üretir', icon: <Users size={16} />, color: '#7C3AED' },
+                                        { value: 'admin', label: 'Yönetici', desc: 'Tam erişim — tüm firmalar ve ayarlar', icon: <Shield size={16} />, color: '#ef4444' },
+                                    ].map(r => (
+                                        <div
+                                            key={r.value}
+                                            onClick={() => isEditing && setEditData({ ...editData, role: r.value as Customer['role'] })}
+                                            style={{
+                                                flex: '1 1 150px',
+                                                padding: 'var(--spacing-md)',
+                                                borderRadius: 'var(--radius-md)',
+                                                border: `2px solid ${(editData.role || (customer.is_admin ? 'admin' : 'client')) === r.value ? r.color : 'var(--border-color)'}`,
+                                                background: (editData.role || (customer.is_admin ? 'admin' : 'client')) === r.value ? `${r.color}10` : 'var(--bg-tertiary)',
+                                                cursor: isEditing ? 'pointer' : 'default',
+                                                transition: 'all 0.2s',
+                                                opacity: isEditing ? 1 : 0.7,
+                                            }}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', color: r.color }}>
+                                                {r.icon}
+                                                <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{r.label}</span>
+                                            </div>
+                                            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{r.desc}</p>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
+
+                            {/* Content Creator → Client assignment */}
+                            {(editData.role === 'content_creator') && (
+                                <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+                                    <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--spacing-md)' }}>
+                                        Atanacak Firmalar
+                                    </h4>
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 'var(--spacing-md)' }}>
+                                        Bu içerik üreticinin hangi firmaların içeriklerini oluşturabileceğini seçin.
+                                    </p>
+                                    {allCustomers.filter(c => c.role !== 'content_creator').map(c => {
+                                        const isChecked = (editData.assigned_clients || []).includes(c.id);
+                                        return (
+                                            <label key={c.id} style={{
+                                                display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)',
+                                                padding: 'var(--spacing-xs) var(--spacing-sm)',
+                                                cursor: isEditing ? 'pointer' : 'default',
+                                            }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isChecked}
+                                                    disabled={!isEditing}
+                                                    onChange={() => {
+                                                        const current = editData.assigned_clients || [];
+                                                        setEditData({
+                                                            ...editData,
+                                                            assigned_clients: isChecked
+                                                                ? current.filter(id => id !== c.id)
+                                                                : [...current, c.id]
+                                                        });
+                                                    }}
+                                                />
+                                                <span style={{ fontWeight: 500 }}>{c.company_name}</span>
+                                                <span className="badge badge-secondary" style={{ fontSize: '0.6rem' }}>{c.industry || 'Genel'}</span>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -553,23 +752,37 @@ const AdminPage: React.FC = () => {
 
     const handleUpdateCustomer = async (updatedCustomer: Customer) => {
         try {
+            const updatePayload: Record<string, unknown> = {
+                company_name: updatedCustomer.company_name,
+                industry: updatedCustomer.industry,
+                email: updatedCustomer.email,
+                phone: updatedCustomer.phone,
+                website: updatedCustomer.website,
+                address: updatedCustomer.address,
+                ai_prompt_prefix: updatedCustomer.ai_prompt_prefix,
+                brand_guidelines: updatedCustomer.brand_guidelines,
+                instagram_token: updatedCustomer.instagram_token,
+                twitter_token: updatedCustomer.twitter_token,
+                linkedin_token: updatedCustomer.linkedin_token,
+                tiktok_token: updatedCustomer.tiktok_token,
+                metricool_api_key: updatedCustomer.metricool_api_key,
+                limesocial_api_key: updatedCustomer.limesocial_api_key,
+            };
+
+            // Update role if changed
+            if (updatedCustomer.role) {
+                updatePayload.role = updatedCustomer.role;
+                updatePayload.is_admin = updatedCustomer.role === 'admin';
+            }
+
+            // Update assigned_clients for content creators
+            if (updatedCustomer.role === 'content_creator' && updatedCustomer.assigned_clients) {
+                updatePayload.assigned_clients = updatedCustomer.assigned_clients;
+            }
+
             const { error } = await supabase
                 .from('customer_profiles')
-                .update({
-                    company_name: updatedCustomer.company_name,
-                    industry: updatedCustomer.industry,
-                    email: updatedCustomer.email,
-                    phone: updatedCustomer.phone,
-                    website: updatedCustomer.website,
-                    address: updatedCustomer.address,
-                    ai_prompt_prefix: updatedCustomer.ai_prompt_prefix,
-                    instagram_token: updatedCustomer.instagram_token,
-                    twitter_token: updatedCustomer.twitter_token,
-                    linkedin_token: updatedCustomer.linkedin_token,
-                    tiktok_token: updatedCustomer.tiktok_token,
-                    metricool_api_key: updatedCustomer.metricool_api_key,
-                    publer_api_key: updatedCustomer.publer_api_key,
-                })
+                .update(updatePayload)
                 .eq('id', updatedCustomer.id);
 
             if (error) throw error;
@@ -759,16 +972,21 @@ const AdminPage: React.FC = () => {
                                         {new Date(customer.created_at).toLocaleDateString('tr-TR')}
                                     </td>
                                     <td style={{ padding: 'var(--spacing-md)' }}>
-                                        {customer.is_admin ? (
-                                            <div className="badge badge-info" style={{ color: '#8b5cf6', background: 'rgba(139, 92, 246, 0.1)' }}>
-                                                <Shield size={12} />
-                                                <span>Admin</span>
-                                            </div>
-                                        ) : (
-                                            <div className="badge badge-neutral">
-                                                <span>Standart</span>
-                                            </div>
-                                        )}
+                                        {(() => {
+                                            const role = customer.role || (customer.is_admin ? 'admin' : 'client');
+                                            const roleConfig: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
+                                                admin: { label: 'Yönetici', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)', icon: <Shield size={12} /> },
+                                                client: { label: 'Müşteri', color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)', icon: <Building2 size={12} /> },
+                                                content_creator: { label: 'İçerik Üretici', color: '#7C3AED', bg: 'rgba(124, 58, 237, 0.1)', icon: <Users size={12} /> },
+                                            };
+                                            const cfg = roleConfig[role] || roleConfig.client;
+                                            return (
+                                                <div className="badge" style={{ color: cfg.color, background: cfg.bg }}>
+                                                    {cfg.icon}
+                                                    <span>{cfg.label}</span>
+                                                </div>
+                                            );
+                                        })()}
                                     </td>
                                     <td style={{ padding: 'var(--spacing-md)' }} onClick={e => e.stopPropagation()}>
                                         <div style={{ display: 'flex', gap: 'var(--spacing-xs)' }}>

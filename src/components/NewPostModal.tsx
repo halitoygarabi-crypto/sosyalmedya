@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Instagram, Twitter, Linkedin, Play, Calendar, Clock, Image as ImageIcon, Send, Sparkles, Upload, FileVideo } from 'lucide-react';
 import { n8nService } from '../utils/n8nService';
-import { publerService } from '../utils/publerService';
+// LimeSocial does not need a separate import here — media is handled via URL
 import { useDashboard } from '../context/DashboardContext';
 import type { Platform, Post } from '../types';
 import { generateId, getOptimalPostingTime, getPlatformName } from '../utils/helpers';
@@ -13,7 +13,7 @@ interface NewPostModalProps {
 }
 
 const NewPostModal: React.FC<NewPostModalProps> = ({ isOpen, onClose }) => {
-    const { addPost, addNotification, activeClient, publerSettings } = useDashboard();
+    const { addPost, addNotification, activeClient, limeSocialSettings } = useDashboard();
 
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
@@ -35,7 +35,7 @@ const NewPostModal: React.FC<NewPostModalProps> = ({ isOpen, onClose }) => {
 
         setIsGenerating(true);
         try {
-            const result = await n8nService.generateContent(title, activeClient?.id || 'client_1', publerSettings);
+            const result = await n8nService.generateContent(title, activeClient?.id || 'client_1', limeSocialSettings);
             if (result) {
                 setContent(result.caption);
                 if (result.videoUrl) {
@@ -237,18 +237,13 @@ const NewPostModal: React.FC<NewPostModalProps> = ({ isOpen, onClose }) => {
                                         onClick={async () => {
                                             if (!selectedFile) return;
                                             setIsUploading(true);
-                                            const result = await publerService.uploadMedia(selectedFile, {
-                                                apiKey: publerSettings.apiKey,
-                                                workspaceId: publerSettings.workspaceId
-                                            });
+                                            // LimeSocial uses mediaUrl, so we create a local preview URL
+                                            // For production, upload to a CDN/storage first
+                                            const objectUrl = URL.createObjectURL(selectedFile);
+                                            setImageUrl(objectUrl);
+                                            setUploadedMediaId('local_' + Date.now());
                                             setIsUploading(false);
-                                            if (result.success && result.mediaId) {
-                                                setUploadedMediaId(result.mediaId);
-                                                if (result.url) setImageUrl(result.url);
-                                                addNotification({ type: 'success', message: 'Dosya Publer\'a yüklendi!', read: false });
-                                            } else {
-                                                addNotification({ type: 'error', message: result.error || 'Yükleme başarısız', read: false });
-                                            }
+                                            addNotification({ type: 'success', message: 'Dosya hazırlandı!', read: false });
                                         }}
                                         disabled={isUploading}
                                     >

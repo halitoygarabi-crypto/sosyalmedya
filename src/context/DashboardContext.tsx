@@ -4,7 +4,7 @@ import type { Post, Notification, Platform, PostStatus, Client } from '../types'
 import { mockClients } from '../data/mockData';
 import { n8nService } from '../utils/n8nService';
 import { supabaseService } from '../utils/supabaseService';
-import { publerService } from '../utils/publerService';
+import { limeSocialService } from '../utils/limeSocialService';
 import { useAuth } from './AuthContext';
 
 interface DashboardContextType {
@@ -25,10 +25,9 @@ interface DashboardContextType {
     isLoading: boolean;
     clients: Client[];
     activeClient: Client | null;
-    publerSettings: {
+    limeSocialSettings: {
         apiKey: string;
-        workspaceId: string;
-        accountIds: string;
+        accounts: string;
     };
 
     // Actions
@@ -46,7 +45,7 @@ interface DashboardContextType {
     markNotificationRead: (id: string) => void;
     clearNotifications: () => void;
     setActiveClientId: (id: string) => void;
-    updatePublerSettings: (settings: Partial<DashboardContextType['publerSettings']>) => void;
+    updateLimeSocialSettings: (settings: Partial<DashboardContextType['limeSocialSettings']>) => void;
     publishPost: (post: Post) => Promise<void>;
 }
 
@@ -71,12 +70,11 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
     const [isLoading, setIsLoading] = useState(false);
     const [clients, setClients] = useState<Client[]>([]);
     const [activeClientId, setActiveClientId] = useState<string>('');
-    const [publerSettings, setPublerSettings] = useState(() => {
-        const saved = localStorage.getItem('publer_settings');
+    const [limeSocialSettings, setLimeSocialSettings] = useState(() => {
+        const saved = localStorage.getItem('limesocial_settings');
         return saved ? JSON.parse(saved) : {
-            apiKey: '',
-            workspaceId: '',
-            accountIds: ''
+            apiKey: import.meta.env.VITE_LIMESOCIAL_API_KEY || '',
+            accounts: ''
         };
     });
 
@@ -96,7 +94,9 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
         if (isAdmin) {
             // Admin her müşteriyi görür (Şu an mock datadan, veritabanından da çekilebilir)
             setClients(mockClients);
-            setActiveClientId(mockClients[0].id);
+            if (mockClients.length > 0) {
+                setActiveClientId(mockClients[0].id);
+            }
         } else {
             // Normal firma sadece kendini görür
             const ownClient: Client = {
@@ -136,7 +136,7 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
 
     const addPost = useCallback(async (post: Post) => {
         setIsLoading(true);
-        const n8nSuccess = await n8nService.createPost(post, publerSettings);
+        const n8nSuccess = await n8nService.createPost(post, limeSocialSettings);
         const supabaseSuccess = await supabaseService.createPost(post);
 
         if (supabaseSuccess || n8nSuccess) {
@@ -153,7 +153,7 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
             addNotification({ type: 'warning', message: 'Post yerel kaydedildi ama senkronize edilemedi.', read: false });
         }
         setIsLoading(false);
-    }, [publerSettings, addNotification]);
+    }, [limeSocialSettings, addNotification]);
 
     const updatePost = useCallback(async (id: string, updates: Partial<Post>) => {
         setPosts((prev) =>
@@ -203,32 +203,32 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
         setNotifications([]);
     }, []);
 
-    const updatePublerSettings = useCallback((newSettings: Partial<typeof publerSettings>) => {
-        setPublerSettings((prev: any) => {
+    const updateLimeSocialSettings = useCallback((newSettings: Partial<typeof limeSocialSettings>) => {
+        setLimeSocialSettings((prev: any) => {
             const updated = { ...prev, ...newSettings };
-            localStorage.setItem('publer_settings', JSON.stringify(updated));
+            localStorage.setItem('limesocial_settings', JSON.stringify(updated));
             return updated;
         });
-        addNotification({ type: 'success', message: 'Publer ayarları güncellendi.', read: false });
+        addNotification({ type: 'success', message: 'LimeSocial ayarları güncellendi.', read: false });
     }, [addNotification]);
 
     const publishPost = useCallback(async (post: Post) => {
         setIsLoading(true);
-        addNotification({ type: 'info', message: 'Doğrudan Publer\'a gönderiliyor...', read: false });
-        const result = await publerService.publishPost(post, publerSettings);
+        addNotification({ type: 'info', message: 'LimeSocial\'a gönderiliyor...', read: false });
+        const result = await limeSocialService.publishPost(post, limeSocialSettings);
 
         if (result.success) {
             await updatePost(post.id, { status: 'posted' });
-            addNotification({ type: 'success', message: 'İçerik başarıyla Publer\'a iletildi!', read: false });
+            addNotification({ type: 'success', message: 'İçerik başarıyla LimeSocial üzerinden paylaşıldı!', read: false });
         } else {
             addNotification({
                 type: 'error',
-                message: `Publer hatası: ${result.error || 'Bilinmeyen hata'}`,
+                message: `LimeSocial hatası: ${result.error || 'Bilinmeyen hata'}`,
                 read: false
             });
         }
         setIsLoading(false);
-    }, [publerSettings, updatePost, addNotification]);
+    }, [limeSocialSettings, updatePost, addNotification]);
 
     const value: DashboardContextType = {
         posts,
@@ -256,8 +256,8 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
         clients,
         activeClient,
         setActiveClientId,
-        publerSettings,
-        updatePublerSettings,
+        limeSocialSettings,
+        updateLimeSocialSettings,
         publishPost,
     };
 

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
     Users,
     Sparkles,
@@ -32,6 +32,19 @@ import { useDashboard } from '../context/DashboardContext';
 
 // n8n Webhook URL for AI Influencer Ads
 const N8N_AI_INFLUENCER_WEBHOOK = import.meta.env.VITE_N8N_AI_INFLUENCER_TEST_WEBHOOK_URL || 'https://n8n.polmarkai.pro/webhook-test/ai-influencer-ad';
+
+interface SelectedClient {
+    id: string;
+    company_name: string;
+    industry: string | null;
+    logo_url: string | null;
+    ai_prompt_prefix?: string;
+    brand_guidelines?: string;
+}
+
+interface AIInfluencerGeneratorProps {
+    selectedClient?: SelectedClient | null;
+}
 
 interface AdCampaignRequest {
     influencer_name: string;
@@ -79,7 +92,7 @@ interface AdCampaignResponse {
     error?: string;
 }
 
-const AIInfluencerGenerator: React.FC = () => {
+const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedClient }) => {
     const { addNotification } = useDashboard();
 
     const [provider, setProvider] = useState<'fal' | 'higgsfield'>('fal');
@@ -119,7 +132,7 @@ const AIInfluencerGenerator: React.FC = () => {
         influencer_look: 'Young Turkish woman, mid-20s, long dark hair, brown eyes, natural glowing makeup, warm confident smile',
         product_name: '',
         product_description: '',
-        brand_name: '',
+        brand_name: selectedClient?.company_name || '',
         ad_goal: 'conversion',
         target_audience: '25-40 yaş arası, dijital ürünlere ilgi duyan',
         tone: 'samimi, güvenilir, bilgilendirici',
@@ -127,6 +140,13 @@ const AIInfluencerGenerator: React.FC = () => {
         video_duration: 15,
         video_aspect_ratio: '9:16'
     });
+
+    // Update brand name when selected client changes
+    useEffect(() => {
+        if (selectedClient) {
+            setAdCampaign(prev => ({ ...prev, brand_name: selectedClient.company_name }));
+        }
+    }, [selectedClient]);
 
     const updatePromptFromPersona = useCallback(() => {
         const fullPrompt = `High-quality professional photo of a ${persona.age} year old ${persona.ethnicity} ${persona.gender}, ${persona.style}, ${persona.activity}, at a ${persona.location}, detailed features, realistic skin texture, 8k resolution, cinematic lighting, shot on 35mm lens.`;
@@ -152,11 +172,18 @@ const AIInfluencerGenerator: React.FC = () => {
         setResult(null);
         addNotification({ type: 'info', message: '📸 AI Influencer görseli üretiliyor...', read: false });
 
+        // Build augmented prompt with client context
+        let augmentedPrompt = '';
+        if (selectedClient?.ai_prompt_prefix) {
+            augmentedPrompt += `${selectedClient.ai_prompt_prefix} `;
+        }
+        augmentedPrompt += prompt;
+
         let response: InfluencerGenerationResponse;
 
         if (provider === 'fal') {
             const request: InfluencerGenerationRequest = {
-                prompt,
+                prompt: augmentedPrompt,
                 aspectRatio,
                 model,
             };
@@ -185,7 +212,7 @@ const AIInfluencerGenerator: React.FC = () => {
         } else {
             addNotification({ type: 'error', message: `❌ ${response.error}`, read: false });
         }
-    }, [prompt, aspectRatio, model, addNotification, provider]);
+    }, [prompt, aspectRatio, model, addNotification, provider, selectedClient]);
 
     const handleAnimate = useCallback(async () => {
         if (!result?.imageUrl) return;

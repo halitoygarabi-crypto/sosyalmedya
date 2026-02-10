@@ -23,7 +23,7 @@ export const n8nService = {
     },
 
     // Send a new post to n8n workflow
-    createPost: async (postData: Partial<Post>, publerSettings?: any): Promise<boolean> => {
+    createPost: async (postData: Partial<Post>, limeSocialSettings?: Record<string, string>): Promise<boolean> => {
         try {
             const response = await fetch(WEBHOOK_URL, {
                 method: 'POST',
@@ -31,7 +31,7 @@ export const n8nService = {
                 body: JSON.stringify({
                     action: 'create_post',
                     data: postData,
-                    publer: publerSettings
+                    limesocial: limeSocialSettings
                 }),
             });
             return response.ok;
@@ -73,7 +73,7 @@ export const n8nService = {
     },
 
     // Generate AI content (caption + video) with customer-specific prompt
-    generateContent: async (content: string, customerId: string, publerSettings?: any): Promise<{ caption: string; videoUrl: string } | null> => {
+    generateContent: async (content: string, customerId: string, limeSocialSettings?: Record<string, string>): Promise<{ caption: string; videoUrl: string } | null> => {
         try {
             const response = await fetch(WEBHOOK_URL, {
                 method: 'POST',
@@ -82,7 +82,7 @@ export const n8nService = {
                     action: 'generate_content',
                     content,
                     customerId,
-                    publer: publerSettings
+                    limesocial: limeSocialSettings
                 }),
             });
 
@@ -101,21 +101,21 @@ export const n8nService = {
         }
     },
 
-    // Manually publish a verified post to Publer
-    publishToPubler: async (post: Post, publerSettings: any): Promise<boolean> => {
+    // Manually publish a verified post to LimeSocial
+    publishToLimeSocial: async (post: Post, limeSocialSettings: Record<string, string>): Promise<boolean> => {
         try {
             const response = await fetch(WEBHOOK_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    action: 'publish_to_publer', // n8n tarafında bu aksiyonu karşılayacak bir node olmalı
+                    action: 'publish_to_limesocial',
                     post: post,
-                    publer: publerSettings
+                    limesocial: limeSocialSettings
                 }),
             });
             return response.ok;
         } catch (error) {
-            console.error('n8n Webhook Error (publishToPubler):', error);
+            console.error('n8n Webhook Error (publishToLimeSocial):', error);
             return false;
         }
     }

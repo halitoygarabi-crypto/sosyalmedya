@@ -28,6 +28,13 @@ export interface Client {
     aiPromptPrefix?: string;
     configSource: 'google_sheets' | 'notion' | 'manual';
     configUrl?: string;
+    phone?: string;
+    website?: string;
+    address?: string;
+    socialAccounts?: Record<string, string>;
+    brandGuidelines?: string;
+    assignedInfluencers?: Influencer[];
+    assets?: ClientAsset[];
 }
 
 export interface Post {
@@ -86,7 +93,7 @@ export interface Notification {
 }
 
 // User Types
-export type UserRole = 'admin' | 'editor' | 'viewer';
+export type UserRole = 'admin' | 'client' | 'content_creator';
 
 export interface User {
     id: string;
@@ -94,6 +101,7 @@ export interface User {
     email: string;
     role: UserRole;
     avatar?: string;
+    assignedClients?: string[]; // For content_creator role
 }
 
 // Sentiment Analysis
@@ -123,6 +131,50 @@ export interface WeeklyReport {
     performanceChange: number;
 }
 
+export interface Report {
+    id: string;
+    clientId: string;
+    reportType: 'weekly' | 'monthly';
+    periodStart: string;
+    periodEnd: string;
+    data: Record<string, unknown>;
+    pdfUrl?: string;
+    generatedAt: string;
+}
+
+// AI Influencer Types
+export interface Influencer {
+    id: string;
+    name: string;
+    avatarUrl?: string;
+    style?: string;
+    personality?: string;
+    voiceTone?: string;
+    targetAudience?: string;
+    createdBy: string;
+    createdAt: string;
+}
+
+export interface ClientInfluencer {
+    id: string;
+    clientId: string;
+    influencerId: string;
+    assignedAt: string;
+    influencer?: Influencer;
+}
+
+// Client Assets
+export interface ClientAsset {
+    id: string;
+    clientId: string;
+    assetType: 'logo' | 'brand_image' | 'document' | 'video' | 'other';
+    fileUrl: string;
+    fileName?: string;
+    description?: string;
+    uploadedBy: string;
+    uploadedAt: string;
+}
+
 // Platform Connection Settings
 export interface PlatformConnection {
     platform: Platform;
@@ -136,5 +188,5 @@ export interface PlatformConnection {
     apiKey?: string;
     apiSecret?: string;
     pageId?: string; // For Facebook/Instagram Business
-    workspaceId?: string; // For Publer integration per platform
+    workspaceId?: string; // For LimeSocial integration per platform
 }

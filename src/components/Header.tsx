@@ -103,7 +103,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onNewPost, companyName, on
                         </p>
                         <div className="badge badge-success" style={{ fontSize: '0.65rem', padding: '1px 8px' }}>
                             <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'currentColor', marginRight: '4px' }}></div>
-                            Publer API: Aktif
+                            LimeSocial API: Aktif
                         </div>
                     </div>
                 </div>

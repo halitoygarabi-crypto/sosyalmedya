@@ -35,46 +35,36 @@ import {
 import {
     AIInfluencerGenerator,
 } from '../components';
+import ReportDownloader from '../components/ReportDownloader';
 import { useAuth } from '../context/AuthContext';
 import { useDashboard } from '../context/DashboardContext';
 import { formatNumber } from '../utils/helpers';
 
-// Mock analytics data - will be replaced with Metricool API
+// Analytics data - will be replaced with Metricool API
 const mockAnalytics = {
-    followers: 12450,
-    followerGrowth: 5.2,
-    engagement: 4.8,
-    engagementChange: 0.3,
-    reach: 45200,
-    reachChange: -2.1,
-    impressions: 89500,
-    impressionsChange: 8.5
+    followers: 0,
+    followerGrowth: 0,
+    engagement: 0,
+    engagementChange: 0,
+    reach: 0,
+    reachChange: 0,
+    impressions: 0,
+    impressionsChange: 0
 };
 
 const weeklyData = [
-    { day: 'Pzt', followers: 12100, engagement: 4.2, reach: 41000 },
-    { day: 'Sal', followers: 12150, engagement: 4.5, reach: 42500 },
-    { day: 'Çar', followers: 12200, engagement: 5.1, reach: 44000 },
-    { day: 'Per', followers: 12280, engagement: 4.8, reach: 43200 },
-    { day: 'Cum', followers: 12350, engagement: 5.2, reach: 45800 },
-    { day: 'Cmt', followers: 12400, engagement: 4.9, reach: 44500 },
-    { day: 'Paz', followers: 12450, engagement: 4.8, reach: 45200 }
+    { day: 'Pzt', followers: 0, engagement: 0, reach: 0 },
+    { day: 'Sal', followers: 0, engagement: 0, reach: 0 },
+    { day: 'Çar', followers: 0, engagement: 0, reach: 0 },
+    { day: 'Per', followers: 0, engagement: 0, reach: 0 },
+    { day: 'Cum', followers: 0, engagement: 0, reach: 0 },
+    { day: 'Cmt', followers: 0, engagement: 0, reach: 0 },
+    { day: 'Paz', followers: 0, engagement: 0, reach: 0 }
 ];
 
-const platformDistribution = [
-    { name: 'Instagram', value: 45, color: '#E4405F' },
-    { name: 'Twitter', value: 25, color: '#1DA1F2' },
-    { name: 'LinkedIn', value: 20, color: '#0A66C2' },
-    { name: 'TikTok', value: 10, color: '#00f2ea' }
-];
+const platformDistribution: { name: string; value: number; color: string }[] = [];
 
-const topPosts = [
-    { id: 1, title: 'Yeni ürün lansmanı', platform: 'instagram', engagement: 892, reach: 12500 },
-    { id: 2, title: 'Müşteri hikayesi', platform: 'linkedin', engagement: 654, reach: 8900 },
-    { id: 3, title: 'Haftalık ipuçları', platform: 'twitter', engagement: 423, reach: 6200 },
-    { id: 4, title: 'Behind the scenes', platform: 'instagram', engagement: 389, reach: 5800 },
-    { id: 5, title: 'Ekip tanıtımı', platform: 'tiktok', engagement: 312, reach: 4500 }
-];
+const topPosts: { id: number; title: string; platform: string; engagement: number; reach: number }[] = [];
 
 // KPI Card Component
 const KPICard: React.FC<{
@@ -122,11 +112,11 @@ const KPICard: React.FC<{
 // Weekly Report Card
 const WeeklyReportCard: React.FC = () => {
     const currentWeek = {
-        posts: 12,
-        totalEngagement: 3245,
-        avgReach: 8500,
-        topPlatform: 'Instagram',
-        growth: '+5.2%'
+        posts: 0,
+        totalEngagement: 0,
+        avgReach: 0,
+        topPlatform: '-',
+        growth: '0%'
     };
 
     return (
@@ -573,30 +563,21 @@ const ClientDashboard: React.FC = () => {
                     </div>
                 )}
 
-                {activeSection === 'weekly-report' && (
+                {activeSection === 'weekly-report' && customerProfile && (
                     <div className="section">
-                        <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: 'var(--spacing-lg)' }}>
-                            Haftalık Rapor
-                        </h2>
-                        <WeeklyReportCard />
-                        <div style={{ marginTop: 'var(--spacing-xl)' }}>
-                            <TopPostsList />
-                        </div>
+                        <ReportDownloader
+                            clientId={customerProfile.id}
+                            clientName={customerProfile.company_name}
+                        />
                     </div>
                 )}
 
-                {activeSection === 'monthly-report' && (
+                {activeSection === 'monthly-report' && customerProfile && (
                     <div className="section">
-                        <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: 'var(--spacing-lg)' }}>
-                            Aylık Rapor
-                        </h2>
-                        <div className="card" style={{ padding: 'var(--spacing-xl)', textAlign: 'center' }}>
-                            <Calendar size={48} style={{ color: 'var(--text-muted)', marginBottom: 'var(--spacing-md)' }} />
-                            <h3 style={{ fontSize: '1rem', marginBottom: 'var(--spacing-sm)' }}>Aylık Rapor Hazırlanıyor</h3>
-                            <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-                                Şubat 2026 raporu ay sonunda otomatik olarak oluşturulacaktır.
-                            </p>
-                        </div>
+                        <ReportDownloader
+                            clientId={customerProfile.id}
+                            clientName={customerProfile.company_name}
+                        />
                     </div>
                 )}
 

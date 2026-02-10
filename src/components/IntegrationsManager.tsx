@@ -41,7 +41,7 @@ const IntegrationsManager: React.FC = () => {
     const [isSyncing, setIsSyncing] = useState(false);
     const [connections, setConnections] = useState<Record<Platform, PlatformConnection>>(getDefaultConnections());
     const [expandedPlatform, setExpandedPlatform] = useState<Platform | null>(null);
-    const [usePubler, setUsePubler] = useState(true); // Toggle between direct API and Publer
+    const [useLimeSocial, setUseLimeSocial] = useState(true); // Toggle between direct API and LimeSocial
 
     // Load saved connections from localStorage
     useEffect(() => {
@@ -55,16 +55,16 @@ const IntegrationsManager: React.FC = () => {
             }
         }
 
-        const publerMode = localStorage.getItem('use_publer');
-        if (publerMode !== null) {
-            setUsePubler(publerMode === 'true');
+        const limeSocialMode = localStorage.getItem('use_limesocial');
+        if (limeSocialMode !== null) {
+            setUseLimeSocial(limeSocialMode === 'true');
         }
     }, []);
 
     // Save connections to localStorage
     const saveConnections = () => {
         localStorage.setItem('platform_connections', JSON.stringify(connections));
-        localStorage.setItem('use_publer', String(usePubler));
+        localStorage.setItem('use_limesocial', String(useLimeSocial));
         addNotification({ type: 'success', message: 'Bağlantı ayarları kaydedildi!', read: false });
     };
 
@@ -158,21 +158,21 @@ const IntegrationsManager: React.FC = () => {
                     <div>
                         <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '4px' }}>Entegrasyon Modu</h3>
                         <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                            {usePubler
-                                ? 'Publer üzerinden tüm platformlara tek API ile bağlan'
+                            {useLimeSocial
+                                ? 'LimeSocial üzerinden tüm platformlara tek API ile bağlan'
                                 : 'Her platforma doğrudan API ile ayrı ayrı bağlan'}
                         </p>
                     </div>
                     <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
                         <button
-                            className={`btn ${usePubler ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                            onClick={() => setUsePubler(true)}
+                            className={`btn ${useLimeSocial ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                            onClick={() => setUseLimeSocial(true)}
                         >
-                            Publer (Kolay)
+                            LimeSocial (Kolay)
                         </button>
                         <button
-                            className={`btn ${!usePubler ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                            onClick={() => setUsePubler(false)}
+                            className={`btn ${!useLimeSocial ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                            onClick={() => setUseLimeSocial(false)}
                         >
                             Doğrudan API (Gelişmiş)
                         </button>
@@ -180,13 +180,13 @@ const IntegrationsManager: React.FC = () => {
                 </div>
             </div>
 
-            {usePubler ? (
-                /* Publer Mode */
+            {useLimeSocial ? (
+                /* LimeSocial Mode */
                 <>
                     <div className="section-header">
-                        <h2 className="section-title">Publer Entegrasyonu</h2>
+                        <h2 className="section-title">LimeSocial Entegrasyonu</h2>
                     </div>
-                    <PublerSettingsCard />
+                    <LimeSocialSettingsCard />
                 </>
             ) : (
                 /* Direct API Mode */
@@ -520,88 +520,105 @@ const PlatformSettingsForm: React.FC<PlatformSettingsFormProps> = ({ platform, c
     );
 };
 
-// Publer Settings Card (existing functionality)
-const PublerSettingsCard: React.FC = () => {
-    const { publerSettings, updatePublerSettings, addNotification } = useDashboard();
-    const [localSettings, setLocalSettings] = useState(publerSettings);
+// LimeSocial Settings Card
+const LimeSocialSettingsCard: React.FC = () => {
+    const { limeSocialSettings, updateLimeSocialSettings, addNotification } = useDashboard();
+    const [localSettings, setLocalSettings] = useState(limeSocialSettings);
+    const [testResult, setTestResult] = useState<{ credits?: number; success?: boolean } | null>(null);
 
     const handleSave = () => {
-        updatePublerSettings(localSettings);
-        addNotification({ type: 'success', message: 'Publer ayarları kaydedildi!', read: false });
+        updateLimeSocialSettings(localSettings);
+        addNotification({ type: 'success', message: 'LimeSocial ayarları kaydedildi!', read: false });
     };
 
     const testConnection = async () => {
-        addNotification({ type: 'info', message: 'Publer bağlantısı test ediliyor...', read: false });
+        addNotification({ type: 'info', message: 'LimeSocial bağlantısı test ediliyor...', read: false });
         try {
-            const response = await fetch('https://app.publer.com/api/v1/accounts', {
+            const response = await fetch('https://api.limesocial.io/api/v1/me', {
                 headers: {
-                    'Authorization': `Bearer-API ${localSettings.apiKey}`,
-                    'Publer-Workspace-Id': localSettings.workspaceId
+                    'Authorization': localSettings.apiKey
                 }
             });
             if (response.ok) {
                 const data = await response.json();
-                addNotification({ type: 'success', message: `Bağlantı başarılı! ${data.length || 0} hesap bulundu.`, read: false });
+                setTestResult({ credits: data.credits || data.creditsRemaining, success: true });
+                addNotification({ type: 'success', message: `Bağlantı başarılı! ${data.credits || data.creditsRemaining || 0} kredi mevcut.`, read: false });
             } else {
+                setTestResult({ success: false });
                 throw new Error('API hatası');
             }
         } catch (error) {
-            addNotification({ type: 'error', message: 'Publer bağlantısı başarısız!', read: false });
+            setTestResult({ success: false });
+            addNotification({ type: 'error', message: 'LimeSocial bağlantısı başarısız!', read: false });
         }
     };
 
     return (
         <div className="card" style={{ padding: 'var(--spacing-xl)' }}>
-            <div className="grid-3" style={{ gap: 'var(--spacing-xl)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)' }}>
                 <div className="input-group">
                     <label className="input-label">
                         <Key size={14} style={{ display: 'inline', marginRight: '4px' }} />
-                        Publer API Key
+                        LimeSocial API Key
                     </label>
                     <input
                         type="password"
                         className="input"
-                        placeholder="Bearer token..."
+                        placeholder="API anahtarınız..."
                         value={localSettings.apiKey}
                         onChange={(e) => setLocalSettings({ ...localSettings, apiKey: e.target.value })}
                     />
                 </div>
                 <div className="input-group">
                     <label className="input-label">
-                        <Globe size={14} style={{ display: 'inline', marginRight: '4px' }} />
-                        Workspace ID
-                    </label>
-                    <input
-                        type="text"
-                        className="input"
-                        placeholder="697e4aafea..."
-                        value={localSettings.workspaceId}
-                        onChange={(e) => setLocalSettings({ ...localSettings, workspaceId: e.target.value })}
-                    />
-                </div>
-                <div className="input-group">
-                    <label className="input-label">
                         <UserCheck size={14} style={{ display: 'inline', marginRight: '4px' }} />
-                        Account IDs (Virgülle ayırın)
+                        Bağlı Hesaplar (JSON formatında)
                     </label>
-                    <input
-                        type="text"
-                        className="input"
-                        placeholder="697e508edbc2..."
-                        value={localSettings.accountIds}
-                        onChange={(e) => setLocalSettings({ ...localSettings, accountIds: e.target.value })}
+                    <textarea
+                        className="input textarea"
+                        placeholder='[{"platform": "tiktok", "username": "kullanici"}, {"platform": "instagram", "username": "igkullanici"}]'
+                        value={localSettings.accounts}
+                        onChange={(e) => setLocalSettings({ ...localSettings, accounts: e.target.value })}
+                        rows={3}
+                        style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}
                     />
+                    <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        LimeSocial panelinden bağladığınız hesapların platform ve kullanıcı adlarını girin.
+                    </p>
                 </div>
+                {testResult && (
+                    <div style={{
+                        padding: 'var(--spacing-md)',
+                        borderRadius: 'var(--radius-md)',
+                        background: testResult.success ? 'var(--success-bg)' : 'var(--error-bg)',
+                        border: `1px solid ${testResult.success ? 'var(--success)' : 'var(--error)'}`,
+                        fontSize: '0.8rem'
+                    }}>
+                        {testResult.success
+                            ? `✅ Bağlantı başarılı! Kalan Kredi: ${testResult.credits || 'Bilinmiyor'}`
+                            : '❌ Bağlantı başarısız. API anahtarını kontrol edin.'}
+                    </div>
+                )}
             </div>
-            <div style={{ marginTop: 'var(--spacing-lg)', display: 'flex', justifyContent: 'flex-end', gap: 'var(--spacing-sm)' }}>
-                <button className="btn btn-secondary" onClick={testConnection} style={{ gap: '8px' }}>
-                    <RefreshCw size={16} />
-                    <span>Test Et</span>
-                </button>
-                <button className="btn btn-primary" onClick={handleSave} style={{ gap: '8px' }}>
-                    <Save size={16} />
-                    <span>Ayarları Kaydet</span>
-                </button>
+            <div style={{ marginTop: 'var(--spacing-lg)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <a
+                    href="https://limesocial.io/billing"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ fontSize: '0.75rem', color: 'var(--primary)', textDecoration: 'none' }}
+                >
+                    LimeSocial Paneli →
+                </a>
+                <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+                    <button className="btn btn-secondary" onClick={testConnection} style={{ gap: '8px' }}>
+                        <RefreshCw size={16} />
+                        <span>Test Et</span>
+                    </button>
+                    <button className="btn btn-primary" onClick={handleSave} style={{ gap: '8px' }}>
+                        <Save size={16} />
+                        <span>Ayarları Kaydet</span>
+                    </button>
+                </div>
             </div>
         </div>
     );
