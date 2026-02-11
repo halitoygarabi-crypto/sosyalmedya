@@ -71,15 +71,22 @@ export const limeSocialService = {
                 throw new Error('Seçili platformlar için bağlı hesap bulunamadı. LimeSocial panelinden hesaplarınızı bağlayın.');
             }
 
+            // Map postType to LimeSocial specific terms if needed
+            let finalPostType: string = post.postType || 'post';
+            if (finalPostType === 'reel') finalPostType = 'reels';
+            if (finalPostType === 'story') finalPostType = 'stories';
+
             const payload: LimeSocialPostPayload = {
                 title: post.content,
                 accounts: targetAccounts,
-                postType: post.postType || 'post',
+                postType: finalPostType,
             };
 
             // Add media if available
             if (post.imageUrls && post.imageUrls.length > 0) {
                 payload.mediaUrl = post.imageUrls[0];
+            } else if (finalPostType === 'reels' || finalPostType === 'stories') {
+                throw new Error('Reels veya Story paylaşmak için bir görsel/video URL\'i gereklidir.');
             }
 
             // Add schedule if applicable

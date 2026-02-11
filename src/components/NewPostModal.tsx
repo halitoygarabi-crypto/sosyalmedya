@@ -88,6 +88,15 @@ const NewPostModal: React.FC<NewPostModalProps> = ({ isOpen, onClose }) => {
             return;
         }
 
+        if ((postType === 'reel' || postType === 'story') && !imageUrl) {
+            addNotification({
+                type: 'error',
+                message: `${postType === 'reel' ? 'Reel' : 'Story'} paylaşmak için görsel veya video yüklemeniz gerekmektedir.`,
+                read: false,
+            });
+            return;
+        }
+
         const scheduledDateTime = isScheduled && scheduledDate && scheduledTime
             ? new Date(`${scheduledDate}T${scheduledTime}`).toISOString()
             : new Date().toISOString();
