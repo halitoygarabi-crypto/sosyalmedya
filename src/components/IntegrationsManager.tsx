@@ -131,11 +131,11 @@ const IntegrationsManager: React.FC = () => {
 
     const systemIntegrations = [
         {
-            id: 'n8n',
-            name: 'n8n Orchestration',
+            id: 'n99',
+            name: 'n99 Orchestration',
             description: 'İçerik akışı ve iş akışı otomasyonu.',
             status: 'connected',
-            url: 'https://n8n.polmarkai.pro',
+            url: 'https://n99.polmarkai.pro',
             icon: <Zap size={20} />,
             color: '#FF6D5A'
         },

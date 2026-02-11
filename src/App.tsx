@@ -28,12 +28,16 @@ import ReportsSection from './components/ReportsSection';
 import IntegrationsManager from './components/IntegrationsManager';
 import VideoGenerator from './components/VideoGenerator';
 import AIInfluencerGenerator from './components/AIInfluencerGenerator';
-import { Filter, CheckCircle, AlertCircle, Clock, ExternalLink } from 'lucide-react';
+import { Filter, CheckCircle, AlertCircle, Clock, ExternalLink, Trash2 } from 'lucide-react';
+import { formatRelativeTime } from './utils/helpers';
 
 const DashboardContent: React.FC = () => {
   const {
     posts,
     isDarkMode,
+    notifications,
+    clearNotifications,
+    markNotificationRead,
     selectedPlatform,
     selectedStatus,
     setSelectedPlatform,
@@ -147,9 +151,6 @@ const DashboardContent: React.FC = () => {
             )}
           </div>
         </div>
-
-        {/* KPI Cards */}
-        <KPICards />
 
         {/* Main Content Area based on activeSection */}
         <div className="section-content animate-fadeIn">
@@ -349,10 +350,79 @@ const DashboardContent: React.FC = () => {
             <>
               <div className="section-header">
                 <h2 className="section-title">Bildirimler</h2>
+                {notifications.length > 0 && (
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => clearNotifications()}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <Trash2 size={14} />
+                    <span>Tümünü Temizle</span>
+                  </button>
+                )}
               </div>
               <div className="card">
-                <p className="text-muted">Son bildirimleriniz burada listelenir.</p>
-                {/* Notification list would go here */}
+                {notifications.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: 'var(--spacing-2xl)' }}>
+                    <div style={{ fontSize: '3rem', marginBottom: 'var(--spacing-md)' }}>🔔</div>
+                    <p className="text-muted" style={{ fontSize: '0.9rem' }}>Henüz bildirim yok.</p>
+                  </div>
+                ) : (
+                  <div className="notification-list">
+                    {notifications.map((notification) => (
+                      <div
+                        key={notification.id}
+                        className={`notification-item ${notification.type} ${!notification.read ? 'unread' : ''}`}
+                        onClick={() => markNotificationRead(notification.id)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: 'var(--spacing-md)',
+                          padding: 'var(--spacing-md)',
+                          borderBottom: '1px solid var(--border-color)',
+                          cursor: 'pointer',
+                          opacity: notification.read ? 0.7 : 1,
+                          background: notification.read ? 'transparent' : 'var(--bg-hover)',
+                          transition: 'all 0.2s ease',
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: 'var(--radius-md)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                            fontSize: '1rem',
+                            background:
+                              notification.type === 'success' ? 'var(--success-bg)'
+                              : notification.type === 'error' ? 'var(--error-bg)'
+                              : notification.type === 'warning' ? 'var(--warning-bg)'
+                              : 'var(--info-bg)',
+                            color:
+                              notification.type === 'success' ? 'var(--success)'
+                              : notification.type === 'error' ? 'var(--error)'
+                              : notification.type === 'warning' ? 'var(--warning)'
+                              : 'var(--info)',
+                          }}
+                        >
+                          {notification.type === 'success' ? '✓' : notification.type === 'error' ? '✕' : notification.type === 'warning' ? '⚠' : 'ℹ'}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <p style={{ fontSize: '0.875rem', marginBottom: '4px' }}>{notification.message}</p>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                            {notification.timestamp ? formatRelativeTime(notification.timestamp) : ''}
+                          </span>
+                        </div>
+                        {!notification.read && (
+                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-primary)', flexShrink: 0, marginTop: '6px' }} />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -366,12 +436,22 @@ const DashboardContent: React.FC = () => {
                 <div className="card">
                   <h3 className="card-title mb-md">Hızlı Başlangıç</h3>
                   <p className="text-secondary mb-md">Dashboard'u nasıl kullanacağınız hakkında temel bilgiler.</p>
-                  <button className="btn btn-secondary btn-sm">Kılavuzu Oku</button>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => {
+                      window.open('https://docs.n99.polmarkai.pro', '_blank');
+                    }}
+                  >Kılavuzu Oku</button>
                 </div>
                 <div className="card">
                   <h3 className="card-title mb-md">Destek Talebi</h3>
                   <p className="text-secondary mb-md">Bir sorunla mı karşılaştınız? Ekibimize ulaşın.</p>
-                  <button className="btn btn-primary btn-sm">Talep Oluştur</button>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => {
+                      window.location.href = 'mailto:destek@polmarkai.pro?subject=Destek%20Talebi';
+                    }}
+                  >Talep Oluştur</button>
                 </div>
               </div>
             </>
@@ -411,11 +491,11 @@ const DashboardContent: React.FC = () => {
             fontSize: '0.75rem',
           }}
         >
-          <span>© 2026 N8n SocialHub Dashboard. Tüm hakları saklıdır.</span>
+          <span>© 2026 N99 SocialHub Dashboard. Tüm hakları saklıdır.</span>
           <div style={{ display: 'flex', gap: 'var(--spacing-md)' }}>
-            <a href="#" style={{ color: 'var(--text-muted)' }}>Yardım</a>
-            <a href="#" style={{ color: 'var(--text-muted)' }}>Gizlilik</a>
-            <a href="#" style={{ color: 'var(--text-muted)' }}>Kullanım Şartları</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); setActiveSection('help'); }} style={{ color: 'var(--text-muted)', cursor: 'pointer' }}>Yardım</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); setActiveSection('settings'); }} style={{ color: 'var(--text-muted)', cursor: 'pointer' }}>Gizlilik</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); setActiveSection('settings'); }} style={{ color: 'var(--text-muted)', cursor: 'pointer' }}>Kullanım Şartları</a>
           </div>
         </footer>
       </main>

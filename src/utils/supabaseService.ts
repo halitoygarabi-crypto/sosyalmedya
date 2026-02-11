@@ -65,7 +65,7 @@ export const supabaseService = {
         }
     },
 
-    // Yeni post oluştur
+    // Yeni içerik oluştur
     createPost: async (post: Post): Promise<boolean> => {
         try {
             const { error } = await supabase

@@ -65,7 +65,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, activeSection, onSectionChang
         <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
             {/* Logo */}
             <div className="nav-logo">
-                <div className="nav-logo-icon">N8</div>
+                <div className="nav-logo-icon">N99</div>
                 <span className="nav-logo-text">SocialHub</span>
             </div>
 

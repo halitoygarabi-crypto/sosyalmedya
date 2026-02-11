@@ -1,11 +1,11 @@
 import type { Post, PlatformStats } from '../types';
 
-const API_URL = import.meta.env.VITE_N8N_API_URL;
-const API_KEY = import.meta.env.VITE_N8N_API_KEY;
-const WEBHOOK_URL = import.meta.env.VITE_N8N_WEBHOOK_URL;
+const API_URL = import.meta.env.VITE_N99_API_URL || import.meta.env.VITE_N8N_API_URL;
+const API_KEY = import.meta.env.VITE_N99_API_KEY || import.meta.env.VITE_N8N_API_KEY;
+const WEBHOOK_URL = import.meta.env.VITE_N99_WEBHOOK_URL || import.meta.env.VITE_N8N_WEBHOOK_URL;
 
 const headers = {
-    'X-N8N-API-KEY': API_KEY,
+    'X-N99-API-KEY': API_KEY,
     'Content-Type': 'application/json',
 };
 

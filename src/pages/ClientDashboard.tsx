@@ -358,7 +358,7 @@ const ClientSidebar: React.FC<{
         <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
             {/* Logo */}
             <div className="nav-logo">
-                <div className="nav-logo-icon">N8</div>
+                <div className="nav-logo-icon">N99</div>
                 <span className="nav-logo-text">SocialHub</span>
             </div>
 
@@ -670,7 +670,7 @@ const ClientDashboard: React.FC = () => {
                         fontSize: '0.75rem',
                     }}
                 >
-                    © 2026 N8n SocialHub Dashboard. Tüm hakları saklıdır.
+                    © 2026 N99 SocialHub Dashboard. Tüm hakları saklıdır.
                 </footer>
             </main>
         </div>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Instagram, Twitter, Linkedin, Play, Calendar, Clock, Image as ImageIcon, Send, Sparkles, Upload, FileVideo } from 'lucide-react';
-import { n8nService } from '../utils/n8nService';
+import { n99Service } from '../utils/n99Service';
 // LimeSocial does not need a separate import here — media is handled via URL
 import { useDashboard } from '../context/DashboardContext';
 import type { Platform, Post } from '../types';
@@ -26,6 +26,7 @@ const NewPostModal: React.FC<NewPostModalProps> = ({ isOpen, onClose }) => {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [isUploading, setIsUploading] = useState(false);
     const [uploadedMediaId, setUploadedMediaId] = useState<string | null>(null);
+    const [postType, setPostType] = useState<'post' | 'reel' | 'story'>('post');
 
     const generateAIContent = async () => {
         if (!title.trim()) {
@@ -35,7 +36,7 @@ const NewPostModal: React.FC<NewPostModalProps> = ({ isOpen, onClose }) => {
 
         setIsGenerating(true);
         try {
-            const result = await n8nService.generateContent(title, activeClient?.id || 'client_1', limeSocialSettings);
+            const result = await n99Service.generateContent(title, activeClient?.id || 'client_1', limeSocialSettings);
             if (result) {
                 setContent(result.caption);
                 if (result.videoUrl) {
@@ -103,6 +104,7 @@ const NewPostModal: React.FC<NewPostModalProps> = ({ isOpen, onClose }) => {
             metrics: { likes: 0, comments: 0, shares: 0, reach: 0, impressions: 0 },
             createdBy: 'admin',
             createdAt: new Date().toISOString(),
+            postType,
         };
 
         addPost(newPost);
@@ -115,6 +117,7 @@ const NewPostModal: React.FC<NewPostModalProps> = ({ isOpen, onClose }) => {
         setScheduledTime('');
         setImageUrl('');
         setIsScheduled(false);
+        setPostType('post');
 
         onClose();
     };
@@ -125,7 +128,7 @@ const NewPostModal: React.FC<NewPostModalProps> = ({ isOpen, onClose }) => {
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
                 <div className="modal-header">
-                    <h2 className="modal-title">Yeni Post Oluştur</h2>
+                    <h2 className="modal-title">Yeni İçerik Oluştur</h2>
                     <button className="btn btn-ghost btn-icon" onClick={onClose}>
                         <X size={20} />
                     </button>
@@ -207,6 +210,34 @@ const NewPostModal: React.FC<NewPostModalProps> = ({ isOpen, onClose }) => {
                                     Lütfen en az bir platform seçin.
                                 </p>
                             )}
+                        </div>
+                        
+                        {/* Post Type */}
+                        <div className="input-group">
+                            <label className="input-label">Gönderi Türü</label>
+                            <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+                                <button
+                                    type="button"
+                                    className={`btn btn-sm ${postType === 'post' ? 'btn-primary' : 'btn-secondary'}`}
+                                    onClick={() => setPostType('post')}
+                                >
+                                    Normal Post
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`btn btn-sm ${postType === 'reel' ? 'btn-primary' : 'btn-secondary'}`}
+                                    onClick={() => setPostType('reel')}
+                                >
+                                    Reel / Video
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`btn btn-sm ${postType === 'story' ? 'btn-primary' : 'btn-secondary'}`}
+                                    onClick={() => setPostType('story')}
+                                >
+                                    Hikaye (Story)
+                                </button>
+                            </div>
                         </div>
 
 

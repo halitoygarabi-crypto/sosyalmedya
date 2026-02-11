@@ -8,12 +8,19 @@ export interface LimeSocialAccount {
     username: string;
 }
 
+export interface LimeSocialMeResponse {
+    credits?: number;
+    creditsRemaining?: number;
+    [key: string]: any;
+}
+
 export interface LimeSocialPostPayload {
     mediaUrl?: string;
     title: string;
     description?: string;
     accounts: LimeSocialAccount[];
     scheduleDate?: string;
+    postType?: string;
 }
 
 export interface LimeSocialSettings {
@@ -38,7 +45,7 @@ export const limeSocialService = {
     publishPost: async (
         post: Post,
         settings: LimeSocialSettings
-    ): Promise<{ success: boolean; data?: any; error?: string }> => {
+    ): Promise<{ success: boolean; data?: unknown; error?: string }> => {
         try {
             const apiKey = settings.apiKey || API_KEY;
             if (!apiKey) {
@@ -67,6 +74,7 @@ export const limeSocialService = {
             const payload: LimeSocialPostPayload = {
                 title: post.content,
                 accounts: targetAccounts,
+                postType: post.postType || 'post',
             };
 
             // Add media if available
@@ -95,16 +103,17 @@ export const limeSocialService = {
 
             const result = await response.json();
             return { success: true, data: result };
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : String(error);
             console.error('LimeSocial Service Error:', error);
-            return { success: false, error: error.message };
+            return { success: false, error: message };
         }
     },
 
     /**
      * Get user info and connected accounts
      */
-    getMe: async (apiKey?: string): Promise<{ success: boolean; data?: any; error?: string }> => {
+    getMe: async (apiKey?: string): Promise<{ success: boolean; data?: LimeSocialMeResponse; error?: string }> => {
         try {
             const key = apiKey || API_KEY;
             if (!key) {
@@ -125,9 +134,10 @@ export const limeSocialService = {
 
             const result = await response.json();
             return { success: true, data: result };
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : String(error);
             console.error('LimeSocial getMe Error:', error);
-            return { success: false, error: error.message };
+            return { success: false, error: message };
         }
     },
 
@@ -155,9 +165,10 @@ export const limeSocialService = {
 
             const result = await response.json();
             return { success: true, accounts: result.accounts || result };
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : String(error);
             console.error('LimeSocial getAccounts Error:', error);
-            return { success: false, error: error.message };
+            return { success: false, error: message };
         }
     },
 
@@ -175,8 +186,9 @@ export const limeSocialService = {
                 };
             }
             return { success: false, message: result.error || 'Bağlantı başarısız' };
-        } catch (error: any) {
-            return { success: false, message: error.message };
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : String(error);
+            return { success: false, message: message };
         }
     },
 };

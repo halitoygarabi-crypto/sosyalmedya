@@ -125,6 +125,9 @@ const PostList: React.FC<PostListProps> = ({ filter = 'all', limit, showActions 
                                     className="btn btn-ghost btn-icon btn-sm"
                                     title="İstatistikler"
                                     style={{ width: '28px', height: '28px' }}
+                                    onClick={() => {
+                                        alert(`📊 ${post.title}\n\n❤️ Beğeni: ${post.metrics?.likes || 0}\n💬 Yorum: ${post.metrics?.comments || 0}\n🔁 Paylaşım: ${post.metrics?.shares || 0}\n👁️ Erişim: ${post.metrics?.reach || 0}\n📈 Görüntülenme: ${post.metrics?.impressions || 0}`);
+                                    }}
                                 >
                                     <Eye size={14} />
                                 </button>
@@ -144,6 +147,12 @@ const PostList: React.FC<PostListProps> = ({ filter = 'all', limit, showActions 
                                     className="btn btn-ghost btn-icon btn-sm"
                                     title="Düzenle"
                                     style={{ width: '28px', height: '28px' }}
+                                    onClick={() => {
+                                        const newContent = prompt('İçeriği düzenleyin:', post.content);
+                                        if (newContent !== null && newContent.trim() !== '') {
+                                            updatePost(post.id, { content: newContent.trim() });
+                                        }
+                                    }}
                                 >
                                     <Edit size={14} />
                                 </button>

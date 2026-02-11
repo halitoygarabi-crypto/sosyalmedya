@@ -317,7 +317,7 @@ export const AutomationControls: React.FC = () => {
                     }}
                 >
                     {automationEnabled
-                        ? '✓ N8n Workflow Aktif'
+                        ? '✓ N99 Workflow Aktif'
                         : '⚠ Otomasyon devre dışı'}
                 </p>
             </div>

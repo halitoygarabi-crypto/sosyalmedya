@@ -11,7 +11,7 @@ import {
     ChevronDown,
     Plus,
     Building2,
-    Palette,
+
 } from 'lucide-react';
 import { useDashboard } from '../context/DashboardContext';
 import { useAuth } from '../context/AuthContext';
@@ -32,6 +32,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onNewPost, companyName, on
         toggleDarkMode,
         notifications,
         markNotificationRead,
+        clearNotifications,
         searchQuery,
         setSearchQuery,
         activeClient,
@@ -153,67 +154,6 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onNewPost, companyName, on
                     </div>
                 )}
 
-                {/* Canva Design Button - Admin Only */}
-                {isAdmin && (
-                    <button
-                        className="btn btn-secondary"
-                        onClick={() => {
-                            // Canva OAuth URL
-                            const canvaClientId = import.meta.env.VITE_CANVA_CLIENT_ID;
-                            const redirectUri = encodeURIComponent(window.location.origin + '/canva-callback');
-
-                            // PKCE Implementation for modern Canva API
-                            const generateRandomString = (length: number) => {
-                                const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
-                                let result = '';
-                                const values = new Uint32Array(length);
-                                window.crypto.getRandomValues(values);
-                                for (let i = 0; i < length; i++) {
-                                    result += charset[values[i] % charset.length];
-                                }
-                                return result;
-                            };
-
-                            const sha256 = async (plain: string) => {
-                                const encoder = new TextEncoder();
-                                const data = encoder.encode(plain);
-                                return window.crypto.subtle.digest('SHA-256', data);
-                            };
-
-                            const base64urlencode = (a: ArrayBuffer) => {
-                                const uint8Array = new Uint8Array(a);
-                                const binString = String.fromCharCode(...uint8Array);
-                                return btoa(binString)
-                                    .replace(/\+/g, '-')
-                                    .replace(/\//g, '_')
-                                    .replace(/=+$/g, '');
-                            };
-
-                            const startCanvaAuth = async () => {
-                                const state = generateRandomString(32);
-                                const codeVerifier = generateRandomString(128);
-                                localStorage.setItem('canva_oauth_state', state);
-                                localStorage.setItem('canva_code_verifier', codeVerifier);
-
-                                const hashed = await sha256(codeVerifier);
-                                const codeChallenge = base64urlencode(hashed);
-
-                                // Modern Canva scopes with canva: prefix
-                                const scopes = encodeURIComponent('canva:design:content:read canva:design:meta:read');
-                                const canvaAuthUrl = `https://www.canva.com/api/oauth/authorize?client_id=${canvaClientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scopes}&state=${state}&code_challenge=${codeChallenge}&code_challenge_method=s256`;
-
-                                window.open(canvaAuthUrl, '_blank', 'width=600,height=700');
-                            };
-
-                            startCanvaAuth();
-                        }}
-                        style={{ background: 'linear-gradient(135deg, #7B68EE, #9370DB)', border: 'none' }}
-                        title="Canva ile Tasarım Oluştur"
-                    >
-                        <Palette size={16} />
-                        <span>Canva</span>
-                    </button>
-                )}
 
                 {/* Search */}
                 <div className="search-input">
@@ -231,7 +171,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onNewPost, companyName, on
                 {/* New Post Button */}
                 <button className="btn btn-primary" onClick={onNewPost}>
                     <Plus size={18} />
-                    <span>Yeni Post</span>
+                    <span>Yeni İçerik</span>
                 </button>
 
                 {/* Dark Mode Toggle */}
@@ -313,10 +253,28 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onNewPost, companyName, on
                                 style={{
                                     padding: 'var(--spacing-md)',
                                     borderTop: '1px solid var(--border-color)',
-                                    textAlign: 'center',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
                                 }}
                             >
-                                <button className="btn btn-ghost btn-sm">Tümünü Gör</button>
+                                <button
+                                    className="btn btn-ghost btn-sm"
+                                    onClick={() => {
+                                        setShowNotifications(false);
+                                        onSectionChange?.('notifications');
+                                    }}
+                                >Tümünü Gör</button>
+                                {notifications.length > 0 && (
+                                    <button
+                                        className="btn btn-ghost btn-sm"
+                                        style={{ color: 'var(--error)', fontSize: '0.75rem' }}
+                                        onClick={() => {
+                                            clearNotifications();
+                                            setShowNotifications(false);
+                                        }}
+                                    >Temizle</button>
+                                )}
                             </div>
                         </div>
                     )}

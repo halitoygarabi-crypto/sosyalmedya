@@ -2,9 +2,10 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import type { ReactNode } from 'react';
 import type { Post, Notification, Platform, PostStatus, Client } from '../types';
 import { mockClients } from '../data/mockData';
-import { n8nService } from '../utils/n8nService';
+import { n99Service } from '../utils/n99Service';
 import { supabaseService } from '../utils/supabaseService';
 import { limeSocialService } from '../utils/limeSocialService';
+import type { LimeSocialSettings } from '../utils/limeSocialService';
 import { useAuth } from './AuthContext';
 
 interface DashboardContextType {
@@ -71,11 +72,19 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
     const [clients, setClients] = useState<Client[]>([]);
     const [activeClientId, setActiveClientId] = useState<string>('');
     const [limeSocialSettings, setLimeSocialSettings] = useState(() => {
-        const saved = localStorage.getItem('limesocial_settings');
-        return saved ? JSON.parse(saved) : {
-            apiKey: import.meta.env.VITE_LIMESOCIAL_API_KEY || '',
-            accounts: ''
-        };
+        try {
+            const saved = localStorage.getItem('limesocial_settings');
+            return saved ? JSON.parse(saved) : {
+                apiKey: import.meta.env.VITE_LIMESOCIAL_API_KEY || '',
+                accounts: ''
+            };
+        } catch (e) {
+            console.error('Failed to parse limesocial_settings:', e);
+            return {
+                apiKey: import.meta.env.VITE_LIMESOCIAL_API_KEY || '',
+                accounts: ''
+            };
+        }
     });
 
     const addNotification = useCallback((notification: Omit<Notification, 'id' | 'timestamp'>) => {
@@ -136,10 +145,10 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
 
     const addPost = useCallback(async (post: Post) => {
         setIsLoading(true);
-        const n8nSuccess = await n8nService.createPost(post, limeSocialSettings);
+        const n99Success = await n99Service.createPost(post, limeSocialSettings);
         const supabaseSuccess = await supabaseService.createPost(post);
 
-        if (supabaseSuccess || n8nSuccess) {
+        if (supabaseSuccess || n99Success) {
             setPosts((prev) => [post, ...prev]);
             addNotification({
                 type: 'success',
@@ -203,8 +212,8 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
         setNotifications([]);
     }, []);
 
-    const updateLimeSocialSettings = useCallback((newSettings: Partial<typeof limeSocialSettings>) => {
-        setLimeSocialSettings((prev: any) => {
+    const updateLimeSocialSettings = useCallback((newSettings: Partial<LimeSocialSettings>) => {
+        setLimeSocialSettings((prev: LimeSocialSettings) => {
             const updated = { ...prev, ...newSettings };
             localStorage.setItem('limesocial_settings', JSON.stringify(updated));
             return updated;

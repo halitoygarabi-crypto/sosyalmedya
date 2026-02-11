@@ -32,10 +32,9 @@ class AITalkingService {
     }
 
     /**
-     * Generate a talking video using SadTalker with audio from a TTS service
-     * Since SadTalker needs audio, we'll use a simple approach:
-     * 1. First call a TTS API to get audio
-     * 2. Then call SadTalker with the image + audio
+     * Generate a talking video using fal.ai
+     * 1. Generate audio from text using f5-tts
+     * 2. Generate video using SadTalker with the generated audio
      */
     async generateTalkingVideo(request: TalkingInfluencerRequest): Promise<TalkingInfluencerResponse> {
         const apiKey = this.getApiKey();
@@ -44,15 +43,38 @@ class AITalkingService {
         }
 
         try {
-            console.log('🗣️ AI Influencer konuşturuluyor...');
+            console.log('🗣️ AI Influencer konuşturuluyor (2 aşamalı işlem)...');
             console.log('📝 Script:', request.script.substring(0, 50) + '...');
-            console.log('🖼️ Image URL:', request.imageUrl.substring(0, 50) + '...');
 
-            // Step 1: Generate audio using fal.ai SadTalker with a simple static audio
-            // For now, we'll use SadTalker's default behavior
-            // Note: Real implementation would need a TTS first
-            
-            // Try using fal.ai's direct subscribe endpoint
+            // AŞAMA 1: Metinden Ses Üretimi (TTS)
+            console.log('🔊 Ses üretiliyor (fal-ai/f5-tts)...');
+            const ttsResponse = await fetch('https://fal.run/fal-ai/f5-tts', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Key ${apiKey}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    gen_text: request.script,
+                }),
+            });
+
+            if (!ttsResponse.ok) {
+                const errorData = await ttsResponse.json().catch(() => ({}));
+                throw new Error(`TTS Hatası: ${errorData.detail || ttsResponse.status}`);
+            }
+
+            const ttsData = await ttsResponse.json();
+            const audioUrl = ttsData.media?.url || ttsData.url;
+
+            if (!audioUrl) {
+                throw new Error('Ses dosyası üretilemedi.');
+            }
+
+            console.log('✅ Ses üretildi:', audioUrl);
+
+            // AŞAMA 2: Video Üretimi (SadTalker)
+            console.log('🎬 Dudak senkronizasyonu yapılıyor (fal-ai/sadtalker)...');
             const submitResponse = await fetch('https://queue.fal.run/fal-ai/sadtalker', {
                 method: 'POST',
                 headers: {
@@ -61,30 +83,23 @@ class AITalkingService {
                 },
                 body: JSON.stringify({
                     source_image_url: request.imageUrl,
-                    // Use a sample TTS audio - in production you'd generate this from text
-                    driven_audio_url: 'https://fal.media/files/monkey/vUhjR7N-c3qNhNEQBp6TZ.wav',
+                    driven_audio_url: audioUrl,
                     face_model_resolution: '512',
                     expression_scale: 1.0,
                     preprocess: 'crop',
+                    still: true, // Movement is more stable
                 }),
             });
 
-            console.log('📤 SadTalker API response status:', submitResponse.status);
-
             if (!submitResponse.ok) {
                 const errorData = await submitResponse.json().catch(() => ({}));
-                console.error('API Error:', errorData);
-                throw new Error(errorData.detail || errorData.message || `API hatası: ${submitResponse.status}`);
+                throw new Error(`Video Hatası: ${errorData.detail || submitResponse.status}`);
             }
 
             const submitData = await submitResponse.json();
-            console.log('📤 Submit response:', submitData);
-            
             const requestId = submitData.request_id;
 
             if (!requestId) {
-                // Synchronous response
-                console.log('✅ Synchronous response received');
                 return {
                     success: true,
                     videoUrl: submitData.video?.url || submitData.url,
@@ -92,14 +107,14 @@ class AITalkingService {
                 };
             }
 
-            console.log('📤 Request ID:', requestId);
+            console.log('⏳ İşlem kuyruğa alındı, Request ID:', requestId);
 
             // Poll for result
             let attempts = 0;
-            const maxAttempts = 60;
+            const maxAttempts = 120; // Video can take longer
             
             while (attempts < maxAttempts) {
-                await new Promise(resolve => setTimeout(resolve, 5000));
+                await new Promise(resolve => setTimeout(resolve, 3000)); // Poll every 3 seconds
                 
                 try {
                     const statusResponse = await fetch(`https://queue.fal.run/fal-ai/sadtalker/requests/${requestId}/status`, {
@@ -111,8 +126,7 @@ class AITalkingService {
 
                     if (statusResponse.ok) {
                         const statusData = await statusResponse.json();
-                        console.log(`📊 Status (${attempts + 1}/${maxAttempts}):`, statusData.status);
-
+                        
                         if (statusData.status === 'COMPLETED') {
                             const resultResponse = await fetch(`https://queue.fal.run/fal-ai/sadtalker/requests/${requestId}`, {
                                 method: 'GET',
@@ -123,7 +137,6 @@ class AITalkingService {
 
                             if (resultResponse.ok) {
                                 const resultData = await resultResponse.json();
-                                console.log('✅ Video completed:', resultData);
                                 return {
                                     success: true,
                                     videoUrl: resultData.video?.url || resultData.url,
@@ -132,18 +145,16 @@ class AITalkingService {
                             }
                         } else if (statusData.status === 'FAILED') {
                             throw new Error(statusData.error || 'Video üretimi başarısız oldu');
-                        } else if (statusData.status === 'IN_QUEUE' || statusData.status === 'IN_PROGRESS') {
-                            console.log('⏳ Processing...');
                         }
                     }
                 } catch (pollError) {
-                    console.error('Poll error:', pollError);
+                    console.warn('Poll status error (retrying):', pollError);
                 }
                 
                 attempts++;
             }
 
-            throw new Error('Video üretimi zaman aşımına uğradı. Lütfen tekrar deneyin.');
+            throw new Error('Video üretimi zaman aşımına uğradı.');
 
         } catch (error: unknown) {
             console.error('❌ Influencer konuşturma hatası:', error);

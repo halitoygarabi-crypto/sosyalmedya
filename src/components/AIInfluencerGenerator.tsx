@@ -30,8 +30,8 @@ import { higgsfieldService } from '../utils/higgsfieldService';
 import type { InfluencerGenerationRequest, InfluencerGenerationResponse } from '../utils/aiInfluencerService';
 import { useDashboard } from '../context/DashboardContext';
 
-// n8n Webhook URL for AI Influencer Ads
-const N8N_AI_INFLUENCER_WEBHOOK = import.meta.env.VITE_N8N_AI_INFLUENCER_TEST_WEBHOOK_URL || 'https://n8n.polmarkai.pro/webhook-test/ai-influencer-ad';
+// n99 Webhook URL for AI Influencer Ads
+const N99_AI_INFLUENCER_WEBHOOK = import.meta.env.VITE_N99_AI_INFLUENCER_TEST_WEBHOOK_URL || 'https://n99.polmarkai.pro/webhook-test/ai-influencer-ad';
 
 interface SelectedClient {
     id: string;
@@ -115,14 +115,57 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
     const [result, setResult] = useState<InfluencerGenerationResponse | null>(null);
     const [animatedVideo, setAnimatedVideo] = useState<string | null>(null);
     const [script, setScript] = useState('');
-    const [history, setHistory] = useState<InfluencerGenerationResponse[]>([]);
+    const [history, setHistory] = useState<InfluencerGenerationResponse[]>(() => {
+        try {
+            const savedHistory = localStorage.getItem('ai_influencer_history');
+            return savedHistory ? JSON.parse(savedHistory) : [];
+        } catch (e) {
+            console.error('Failed to parse history from localStorage:', e);
+            return [];
+        }
+    });
+
+    // Persist history to localStorage
+    useEffect(() => {
+        localStorage.setItem('ai_influencer_history', JSON.stringify(history));
+    }, [history]);
+
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const imageUrl = reader.result as string;
+                const newResponse: InfluencerGenerationResponse = {
+                    success: true,
+                    imageUrl,
+                    requestId: `local_${Date.now()}`
+                };
+                setResult(newResponse);
+                setHistory(prev => [newResponse, ...prev].slice(0, 20));
+                addNotification({ type: 'success', message: '✅ Görsel başarıyla yüklendi!', read: false });
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleDeleteFromHistory = (requestId: string | undefined, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!requestId) return;
+        setHistory(prev => prev.filter(h => h.requestId !== requestId));
+        if (result?.requestId === requestId) {
+            setResult(null);
+            setAnimatedVideo(null);
+        }
+        addNotification({ type: 'info', message: 'Görsel kütüphaneden silindi', read: false });
+    };
     const [talkingProvider, setTalkingProvider] = useState<'sadtalker' | 'higgsfield'>('sadtalker');
     
     // API Key state
     const [showApiKeyModal, setShowApiKeyModal] = useState(false);
     const [apiKey, setApiKey] = useState(aiInfluencerService.getApiKey());
 
-    // n8n AI Influencer Ads Campaign State
+    // n99 AI Influencer Ads Campaign State
     const [showAdCampaignModal, setShowAdCampaignModal] = useState(false);
     const [isCreatingCampaign, setIsCreatingCampaign] = useState(false);
     const [campaignResult, setCampaignResult] = useState<AdCampaignResponse | null>(null);
@@ -141,12 +184,28 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
         video_aspect_ratio: '9:16'
     });
 
-    // Update brand name when selected client changes
+    // Update brand name and product description when selected client or influencer prompt changes
     useEffect(() => {
         if (selectedClient) {
-            setAdCampaign(prev => ({ ...prev, brand_name: selectedClient.company_name }));
+            setAdCampaign(prev => {
+                const industryInfo = selectedClient.industry ? `Sektör: ${selectedClient.industry}\n` : '';
+                const guidelinesInfo = selectedClient.brand_guidelines ? `Marka Yönergeleri: ${selectedClient.brand_guidelines}\n` : '';
+                const logoInfo = selectedClient.logo_url ? `Marka Logosu / Dosyası: ${selectedClient.logo_url}\n` : '';
+                
+                // Only populate if current description is empty or only contains previous brand info
+                const brandInfo = `${industryInfo}${guidelinesInfo}${logoInfo}`;
+                
+                return { 
+                    ...prev, 
+                    brand_name: selectedClient.company_name,
+                    product_description: prev.product_description || brandInfo,
+                    target_audience: prev.target_audience || (selectedClient.industry ? `${selectedClient.industry} ürünleriyle ilgilenen kitle` : prev.target_audience),
+                    // influencer_look auto-updates from the current influencer generation prompt
+                    influencer_look: prompt || prev.influencer_look
+                };
+            });
         }
-    }, [selectedClient]);
+    }, [selectedClient, prompt]);
 
     const updatePromptFromPersona = useCallback(() => {
         const fullPrompt = `High-quality professional photo of a ${persona.age} year old ${persona.ethnicity} ${persona.gender}, ${persona.style}, ${persona.activity}, at a ${persona.location}, detailed features, realistic skin texture, 8k resolution, cinematic lighting, shot on 35mm lens.`;
@@ -249,7 +308,7 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
         }
     }, [result, script, addNotification, talkingProvider]);
 
-    // n8n AI Influencer Ads Campaign Handler
+    // n99 AI Influencer Ads Campaign Handler
     const handleCreateAdCampaign = useCallback(async () => {
         if (!adCampaign.product_name.trim() || !adCampaign.product_description.trim()) {
             addNotification({ type: 'warning', message: 'Lütfen ürün adı ve açıklamasını girin', read: false });
@@ -261,7 +320,7 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
         addNotification({ type: 'info', message: '🎬 AI Influencer reklam kampanyası oluşturuluyor... Bu işlem 2-5 dakika sürebilir.', read: false });
 
         try {
-            const response = await fetch(N8N_AI_INFLUENCER_WEBHOOK, {
+            const response = await fetch(N99_AI_INFLUENCER_WEBHOOK, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -434,8 +493,8 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
                         </button>
 
                         <div style={{ marginTop: 'var(--spacing-lg)' }}>
-                            <p className="text-xs text-muted mb-sm">Hazır Şablonlar:</p>
-                            <div style={{ display: 'flex', gap: 'var(--spacing-xs)', flexWrap: 'wrap' }}>
+                            <p className="text-xs text-muted mb-sm">Hazır Şablonlar veya Yerel Yükleme:</p>
+                            <div style={{ display: 'flex', gap: 'var(--spacing-xs)', flexWrap: 'wrap', marginBottom: 'var(--spacing-md)' }}>
                                 {personaTemplates.map((t, i) => (
                                     <button 
                                         key={i} 
@@ -451,6 +510,17 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
                                     </button>
                                 ))}
                             </div>
+                            
+                            <label className="btn btn-secondary btn-full btn-sm" style={{ cursor: 'pointer' }}>
+                                <Download size={14} style={{ transform: 'rotate(180deg)' }} />
+                                <span>Bilgisayardan Dosya Seç</span>
+                                <input 
+                                    type="file" 
+                                    accept="image/*" 
+                                    style={{ display: 'none' }} 
+                                    onChange={handleFileUpload}
+                                />
+                            </label>
                         </div>
                     </div>
 
@@ -634,14 +704,39 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
                                             borderRadius: 'var(--radius-sm)', 
                                             overflow: 'hidden',
                                             cursor: 'pointer',
-                                            border: result?.imageUrl === h.imageUrl ? '2px solid var(--accent-primary)' : 'none'
+                                            border: result?.imageUrl === h.imageUrl ? '2px solid var(--accent-primary)' : 'none',
+                                            position: 'relative',
                                         }}
+                                        className="library-item"
                                         onClick={() => {
                                             setResult(h);
                                             setAnimatedVideo(null);
                                         }}
                                     >
                                         <img src={h.imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        <button 
+                                            className="btn-delete"
+                                            onClick={(e) => handleDeleteFromHistory(h.requestId, e)}
+                                            style={{
+                                                position: 'absolute',
+                                                top: '4px',
+                                                right: '4px',
+                                                padding: '4px',
+                                                borderRadius: '50%',
+                                                background: 'rgba(0,0,0,0.5)',
+                                                color: 'white',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                opacity: 0.8,
+                                                zIndex: 10
+                                            }}
+                                            title="Sil"
+                                        >
+                                            <X size={12} />
+                                        </button>
                                     </div>
                                 ))}
                             </div>
@@ -800,11 +895,11 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
                                             </div>
                                         </div>
                                         <div className="input-group" style={{ marginTop: 'var(--spacing-md)' }}>
-                                            <label className="input-label">Ürün Açıklaması *</label>
+                                            <label className="input-label">Ürün Açıklaması / Kampanya Promptu *</label>
                                             <textarea
                                                 className="input"
-                                                rows={2}
-                                                placeholder="Ürünün özelliklerini ve faydalarını detaylı yazın..."
+                                                rows={5}
+                                                placeholder="Ürünün özelliklerini, faydalarını ve kampanya detaylarını yazın..."
                                                 value={adCampaign.product_description}
                                                 onChange={(e) => setAdCampaign({...adCampaign, product_description: e.target.value})}
                                                 disabled={isCreatingCampaign}

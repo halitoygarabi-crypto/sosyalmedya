@@ -51,6 +51,7 @@ export interface Post {
     createdAt: string;
     errorMessage?: string;
     bufferId?: string;
+    postType?: 'post' | 'reel' | 'story';
 }
 
 // Platform Statistics

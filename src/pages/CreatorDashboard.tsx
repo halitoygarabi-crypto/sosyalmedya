@@ -535,7 +535,7 @@ const CreativeStudio: React.FC<CreativeStudioProps> = ({ client, onNewPost }) =>
                                 Markanız için metin tabanlı veya görsel içerikli yeni bir gönderi hazırlayın.
                             </p>
                             <button className="btn btn-primary" onClick={onNewPost}>
-                                <Plus size={18} /> Yeni Post Oluştur
+                                <Plus size={18} /> Yeni İçerik Oluştur
                             </button>
                         </div>
                     </div>
@@ -650,7 +650,7 @@ const CreatorDashboard: React.FC = () => {
                     <div className="header-right">
                         <button className="btn btn-primary" onClick={() => setShowNewPostModal(true)}>
                             <Plus size={18} />
-                            <span>Yeni Post</span>
+                            <span>Yeni İçerik</span>
                         </button>
                     </div>
                 </header>
