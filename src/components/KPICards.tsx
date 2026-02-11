@@ -9,11 +9,10 @@ import {
     ArrowDown,
 } from 'lucide-react';
 import { useDashboard } from '../context/DashboardContext';
-import { mockPlatformStats } from '../data/mockData';
 import { formatNumber } from '../utils/helpers';
 
 const KPICards: React.FC = () => {
-    const { posts, activeClient } = useDashboard();
+    const { posts, activeClient, platformStats } = useDashboard();
 
     const clientPosts = activeClient
         ? posts.filter(p => p.clientId === activeClient.id)
@@ -47,8 +46,8 @@ const KPICards: React.FC = () => {
 
     // Best performing platform
     const clientStats = activeClient
-        ? mockPlatformStats.filter(s => s.clientId === activeClient.id)
-        : mockPlatformStats;
+        ? platformStats.filter(s => s.clientId === activeClient.id)
+        : platformStats;
 
     const bestPlatform = clientStats.length > 0
         ? clientStats.reduce((prev, curr) => curr.avgEngagementRate > prev.avgEngagementRate ? curr : prev)

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import type { Post, Notification, Platform, PostStatus, Client } from '../types';
+import type { Post, Notification, Platform, PostStatus, Client, PlatformStats, DailyEngagement } from '../types';
 import { mockClients } from '../data/mockData';
 import { n99Service } from '../utils/n99Service';
 import { supabaseService } from '../utils/supabaseService';
@@ -26,6 +26,8 @@ interface DashboardContextType {
     isLoading: boolean;
     clients: Client[];
     activeClient: Client | null;
+    platformStats: PlatformStats[];
+    dailyEngagement: DailyEngagement[];
     limeSocialSettings: {
         apiKey: string;
         accounts: string;
@@ -142,6 +144,71 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
 
         loadInitialData();
     }, [activeClientId]);
+
+    // Compute platformStats from posts
+    const [platformStats, setPlatformStats] = useState<PlatformStats[]>([]);
+
+    useEffect(() => {
+        const loadStats = async () => {
+            // Try Supabase platform_stats table first
+            const stats = await supabaseService.fetchStats();
+            if (stats.length > 0) {
+                setPlatformStats(stats);
+                return;
+            }
+            // Fallback: compute from posts
+            const platforms: Platform[] = ['instagram', 'twitter', 'linkedin', 'tiktok'];
+            const computed: PlatformStats[] = platforms.map(platform => {
+                const platformPosts = posts.filter(p => p.platforms.includes(platform));
+                const postedPosts = platformPosts.filter(p => p.status === 'posted');
+                const totalLikes = postedPosts.reduce((s, p) => s + p.metrics.likes, 0);
+                const totalComments = postedPosts.reduce((s, p) => s + p.metrics.comments, 0);
+                const totalShares = postedPosts.reduce((s, p) => s + p.metrics.shares, 0);
+                const totalReach = postedPosts.reduce((s, p) => s + p.metrics.reach, 0);
+                const totalImpressions = postedPosts.reduce((s, p) => s + p.metrics.impressions, 0);
+                const totalEng = totalLikes + totalComments + totalShares;
+                const avgRate = totalReach > 0 ? (totalEng / totalReach) * 100 : 0;
+                return {
+                    clientId: activeClientId || 'default',
+                    platform,
+                    followers: 0,
+                    followerGrowth: 0,
+                    avgEngagementRate: parseFloat(avgRate.toFixed(2)),
+                    postsCount: platformPosts.length,
+                    bestPostingTime: '',
+                    reach: totalReach,
+                    impressions: totalImpressions,
+                };
+            }).filter(s => s.postsCount > 0);
+            setPlatformStats(computed);
+        };
+        loadStats();
+    }, [posts, activeClientId]);
+
+    // Compute daily engagement from posts (last 30 days)
+    const dailyEngagement = React.useMemo<DailyEngagement[]>(() => {
+        const days: Record<string, DailyEngagement> = {};
+        const today = new Date();
+        // Initialize 30 days
+        for (let i = 29; i >= 0; i--) {
+            const d = new Date(today);
+            d.setDate(d.getDate() - i);
+            const key = d.toISOString().split('T')[0];
+            days[key] = { date: key, likes: 0, comments: 0, shares: 0, reach: 0 };
+        }
+        // Aggregate post metrics by date
+        const postedPosts = posts.filter(p => p.status === 'posted');
+        postedPosts.forEach(p => {
+            const dateKey = new Date(p.createdAt).toISOString().split('T')[0];
+            if (days[dateKey]) {
+                days[dateKey].likes += p.metrics.likes;
+                days[dateKey].comments += p.metrics.comments;
+                days[dateKey].shares += p.metrics.shares;
+                days[dateKey].reach += p.metrics.reach;
+            }
+        });
+        return Object.values(days);
+    }, [posts]);
 
     const addPost = useCallback(async (post: Post) => {
         setIsLoading(true);
@@ -264,6 +331,8 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
         automationSettings,
         clients,
         activeClient,
+        platformStats,
+        dailyEngagement,
         setActiveClientId,
         limeSocialSettings,
         updateLimeSocialSettings,
