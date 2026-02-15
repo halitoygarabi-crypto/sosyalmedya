@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Instagram, Twitter, Linkedin, Play, Calendar, Clock, Image as ImageIcon, Send, Sparkles, Upload, FileVideo } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Instagram, Twitter, Linkedin, Play, Calendar, Clock, Image as ImageIcon, Send, Sparkles, Upload, FileVideo, Database } from 'lucide-react';
 import { n99Service } from '../utils/n99Service';
 // LimeSocial does not need a separate import here — media is handled via URL
 import { useDashboard } from '../context/DashboardContext';
@@ -27,6 +27,30 @@ const NewPostModal: React.FC<NewPostModalProps> = ({ isOpen, onClose }) => {
     const [isUploading, setIsUploading] = useState(false);
     const [uploadedMediaId, setUploadedMediaId] = useState<string | null>(null);
     const [postType, setPostType] = useState<'post' | 'reel' | 'story'>('post');
+    const [isSavingToSheet, setIsSavingToSheet] = useState(false);
+    const [hasGeneratedAI, setHasGeneratedAI] = useState(false);
+    const [manualSaved, setManualSaved] = useState(false);
+
+    // Handle prefill from ContentHistory
+    useEffect(() => {
+        if (isOpen) {
+            const prefill = sessionStorage.getItem('prefill_content');
+            if (prefill) {
+                try {
+                    const data = JSON.parse(prefill);
+                    if (data.prompt) setTitle(data.prompt);
+                    if (data.imageUrl) setImageUrl(data.imageUrl);
+                    if (data.type) {
+                        setPostType(data.type === 'video' ? 'reel' : 'post');
+                    }
+                    // Clear after use
+                    sessionStorage.removeItem('prefill_content');
+                } catch (e) {
+                    console.error('Prefill parse error:', e);
+                }
+            }
+        }
+    }, [isOpen]);
 
     const generateAIContent = async () => {
         if (!title.trim()) {
@@ -36,21 +60,68 @@ const NewPostModal: React.FC<NewPostModalProps> = ({ isOpen, onClose }) => {
 
         setIsGenerating(true);
         try {
-            const result = await n99Service.generateContent(title, activeClient?.id || 'client_1', limeSocialSettings);
+            const result = await n99Service.generateContent(
+                title, 
+                activeClient?.id || 'client_1',
+                postType,
+                platforms
+            );
             if (result) {
                 setContent(result.caption);
                 if (result.videoUrl) {
                     setImageUrl(result.videoUrl);
                 }
+                setHasGeneratedAI(true);
+                setManualSaved(false);
                 addNotification({ type: 'success', message: 'AI içeriği ve videosu başarıyla üretildi.', read: false });
             } else {
                 throw new Error('Cevap alınamadı');
             }
         } catch (error) {
             console.error('AI generation failed:', error);
-            addNotification({ type: 'error', message: 'AI içerik üretimi sırasında bir hata oluştu.', read: false });
+            const msg = error instanceof Error ? error.message : 'Bilinmeyen hata';
+            addNotification({ 
+                type: 'error', 
+                message: `AI içerik üretimi başarısız: ${msg}. API anahtarlarınızı (OpenAI / Fal.ai / Replicate) kontrol edin.`, 
+                read: false 
+            });
         } finally {
             setIsGenerating(false);
+        }
+    };
+
+    const handleManualSaveToSheet = async () => {
+        if (!content && !imageUrl) {
+            addNotification({ type: 'warning', message: 'Kaydedilecek içerik bulunamadı.', read: false });
+            return;
+        }
+
+        setIsSavingToSheet(true);
+        try {
+            const { googleSheetsService } = await import('../utils/googleSheetsService');
+            const res = await googleSheetsService.saveToNamedSheet('n99', {
+                date: new Date().toISOString(),
+                prompt: title,
+                imageUrl: imageUrl,
+                type: postType === 'post' ? 'image' : 'video',
+                clientName: activeClient?.name || 'Genel',
+                metadata: {
+                    caption: content,
+                    postType,
+                    method: 'Manual Save'
+                }
+            });
+
+            if (res.success) {
+                setManualSaved(true);
+                addNotification({ type: 'success', message: '📊 Google Sheet\'e başarıyla kaydedildi!', read: false });
+            } else {
+                addNotification({ type: 'error', message: `❌ Kayıt hatası: ${res.error}`, read: false });
+            }
+        } catch {
+            addNotification({ type: 'error', message: 'Bağlantı hatası oluştu.', read: false });
+        } finally {
+            setIsSavingToSheet(false);
         }
     };
 
@@ -101,6 +172,9 @@ const NewPostModal: React.FC<NewPostModalProps> = ({ isOpen, onClose }) => {
             ? new Date(`${scheduledDate}T${scheduledTime}`).toISOString()
             : new Date().toISOString();
 
+        // Determine status: scheduled → 'scheduled', immediate → 'posted'
+        const postStatus = isScheduled ? 'scheduled' : 'posted';
+
         const newPost: Post = {
             id: generateId(),
             clientId: activeClient?.id || 'client_1',
@@ -109,7 +183,7 @@ const NewPostModal: React.FC<NewPostModalProps> = ({ isOpen, onClose }) => {
             imageUrls: imageUrl ? [imageUrl] : [],
             platforms,
             scheduledTime: scheduledDateTime,
-            status: isScheduled ? 'scheduled' : 'draft', // Manuel kontrol için varsayılan taslak
+            status: postStatus,
             metrics: { likes: 0, comments: 0, shares: 0, reach: 0, impressions: 0 },
             createdBy: 'admin',
             createdAt: new Date().toISOString(),
@@ -117,6 +191,19 @@ const NewPostModal: React.FC<NewPostModalProps> = ({ isOpen, onClose }) => {
         };
 
         addPost(newPost);
+
+        // If posting immediately, also publish to LimeSocial
+        if (postStatus === 'posted' && limeSocialSettings?.apiKey) {
+            n99Service.publishToLimeSocial(newPost, limeSocialSettings).then(success => {
+                if (success) {
+                    addNotification({ type: 'success', message: `✅ ${platforms.join(', ')} platformlarına yayınlandı!`, read: false });
+                } else {
+                    addNotification({ type: 'warning', message: '⚠️ LimeSocial yayını başarısız. İçerik kaydedildi.', read: false });
+                }
+            }).catch(() => {
+                addNotification({ type: 'warning', message: '⚠️ LimeSocial bağlantı hatası. İçerik kaydedildi.', read: false });
+            });
+        }
 
         // Reset form
         setTitle('');
@@ -127,6 +214,8 @@ const NewPostModal: React.FC<NewPostModalProps> = ({ isOpen, onClose }) => {
         setImageUrl('');
         setIsScheduled(false);
         setPostType('post');
+        setHasGeneratedAI(false);
+        setManualSaved(false);
 
         onClose();
     };
@@ -175,6 +264,22 @@ const NewPostModal: React.FC<NewPostModalProps> = ({ isOpen, onClose }) => {
                                     )}
                                     <span>AI Sihirbazı</span>
                                 </button>
+                                {hasGeneratedAI && (
+                                    <button
+                                        type="button"
+                                        className="btn btn-ghost btn-sm"
+                                        onClick={handleManualSaveToSheet}
+                                        disabled={isSavingToSheet || manualSaved}
+                                        style={{ color: manualSaved ? 'var(--success)' : '#1d804e', gap: '4px', marginLeft: 'auto' }}
+                                    >
+                                        {isSavingToSheet ? (
+                                            <div className="spinner-sm" />
+                                        ) : (
+                                            <Database size={14} />
+                                        )}
+                                        <span>{manualSaved ? 'Kaydedildi ✓' : 'Tabloya Kaydet'}</span>
+                                    </button>
+                                )}
                             </div>
                             <textarea
                                 className="input textarea"

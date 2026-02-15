@@ -13,13 +13,9 @@ import {
     ChevronRight,
     Calendar,
     BookOpen,
-    TrendingUp,
     Clock,
     CheckCircle2,
-    AlertCircle,
-    Eye,
     Heart,
-    BarChart3,
     Palette,
     Image,
     Sparkles,
@@ -583,11 +579,9 @@ const CreatorDashboard: React.FC = () => {
 
         if (!error && data) {
             setAssignedClients(data);
-            if (data.length > 0 && !selectedClient) {
-                setSelectedClient(data[0]);
-            }
+            setSelectedClient(prev => (prev ? prev : data[0] ?? null));
         }
-    }, [customerProfile?.assigned_clients, selectedClient]);
+    }, [customerProfile?.assigned_clients]);
 
     useEffect(() => {
         fetchClients();
@@ -597,10 +591,8 @@ const CreatorDashboard: React.FC = () => {
 
     // Compute stats
     const totalLikes = clientPosts.reduce((s, p) => s + (p.metrics?.likes || 0), 0);
-    const totalReach = clientPosts.reduce((s, p) => s + (p.metrics?.reach || 0), 0);
     const postedCount = clientPosts.filter(p => p.status === 'posted').length;
     const scheduledCount = clientPosts.filter(p => p.status === 'scheduled').length;
-    const draftCount = clientPosts.filter(p => p.status === 'draft').length;
 
     // Platform distribution
     const platformCounts: Record<string, number> = {};

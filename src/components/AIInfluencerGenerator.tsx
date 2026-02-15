@@ -22,20 +22,22 @@ import {
     Film,
     Send,
     X,
+    FileText,
 } from 'lucide-react';
+import { googleSheetsService } from '../utils/googleSheetsService';
+import type { SheetEntry } from '../utils/googleSheetsService';
 import { aiInfluencerService } from '../utils/aiInfluencerService';
 import { aiTalkingService } from '../utils/aiTalkingService';
 import { ltxVideoService } from '../utils/ltxVideoService';
-import { higgsfieldService } from '../utils/higgsfieldService';
+import { mirakoService } from '../utils/mirakoService';
 import type { InfluencerGenerationRequest, InfluencerGenerationResponse } from '../utils/aiInfluencerService';
 import { useDashboard } from '../context/DashboardContext';
 
-// n99 Webhook URL for AI Influencer Ads
-const N99_AI_INFLUENCER_WEBHOOK = import.meta.env.VITE_N99_AI_INFLUENCER_TEST_WEBHOOK_URL || 'https://n99.polmarkai.pro/webhook-test/ai-influencer-ad';
+import { campaignService } from '../utils/campaignService';
 
 interface SelectedClient {
     id: string;
-    company_name: string;
+    name: string;
     industry: string | null;
     logo_url: string | null;
     ai_prompt_prefix?: string;
@@ -53,12 +55,19 @@ interface AdCampaignRequest {
     product_name: string;
     product_description: string;
     brand_name: string;
+    ad_type: 'both' | 'talking_head' | 'product_showcase';
     ad_goal: 'awareness' | 'conversion' | 'engagement';
     target_audience: string;
+    language: 'tr' | 'en';
     tone: string;
     cta: string;
-    video_duration: number;
+    influencer_image_url?: string;
+    video_duration: string;
+    video_model: string;
     video_aspect_ratio: string;
+    product_image_url?: string;
+    location_image_url?: string;
+    talking_script?: string;
 }
 
 interface AdCampaignResponse {
@@ -69,33 +78,57 @@ interface AdCampaignResponse {
     ad_concept?: {
         theme: string;
         hook: string;
-        unique_selling_point: string;
+        usp: string;
     };
-    images?: {
+    talking_head_ad?: {
+        script: {
+            full_script: string;
+            sections: Array<{ time: string; text: string; emotion: string }>;
+        };
+        video_url: string | null;
+        video_status: string;
+        source_image: string;
+    };
+    product_ad?: {
+        info: {
+            scene: string;
+            overlay_texts: string[];
+            music_mood: string;
+        };
+        video_url: string | null;
+        video_status: string;
+        source_image: string;
+    };
+    lifestyle_ad?: {
+        video_url: string | null;
+        video_status: string;
+        source_image: string;
+    };
+    all_images?: {
         influencer_main: string;
         influencer_closeup: string;
         product_hero: string;
         lifestyle: string;
     };
-    videos?: {
-        talking_head: string;
-        product_showcase: string;
-        lifestyle: string;
+    all_videos?: {
+        talking_head: string | null;
+        product: string | null;
+        lifestyle: string | null;
     };
     instagram?: {
-        reel: {
-            caption: string;
-            hashtags: string;
-            best_posting_time: string;
-        };
+        caption: string;
+        hashtags: string;
+        cover_text: string;
+        posting_time: string;
     };
+    ab_test_hooks?: string[];
     error?: string;
 }
 
 const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedClient }) => {
     const { addNotification } = useDashboard();
 
-    const [provider, setProvider] = useState<'fal' | 'higgsfield'>('fal');
+    const [provider, setProvider] = useState<'fal' | 'mirako'>('fal');
     const [prompt, setPrompt] = useState('');
     const [aspectRatio, setAspectRatio] = useState<'1:1' | '16:9' | '9:16' | '4:3'>('1:1');
     const [model, setModel] = useState<'flux-pro' | 'flux-schnell'>('flux-schnell');
@@ -111,6 +144,7 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
     });
 
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isGeneratingScript, setIsGeneratingScript] = useState(false);
     const [isAnimating, setIsAnimating] = useState(false);
     const [result, setResult] = useState<InfluencerGenerationResponse | null>(null);
     const [animatedVideo, setAnimatedVideo] = useState<string | null>(null);
@@ -149,17 +183,7 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
         }
     };
 
-    const handleDeleteFromHistory = (requestId: string | undefined, e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (!requestId) return;
-        setHistory(prev => prev.filter(h => h.requestId !== requestId));
-        if (result?.requestId === requestId) {
-            setResult(null);
-            setAnimatedVideo(null);
-        }
-        addNotification({ type: 'info', message: 'Görsel kütüphaneden silindi', read: false });
-    };
-    const [talkingProvider, setTalkingProvider] = useState<'sadtalker' | 'higgsfield'>('sadtalker');
+    const [talkingProvider, setTalkingProvider] = useState<'sadtalker' | 'mirako'>('sadtalker');
     
     // API Key state
     const [showApiKeyModal, setShowApiKeyModal] = useState(false);
@@ -169,20 +193,34 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
     const [showAdCampaignModal, setShowAdCampaignModal] = useState(false);
     const [isCreatingCampaign, setIsCreatingCampaign] = useState(false);
     const [campaignResult, setCampaignResult] = useState<AdCampaignResponse | null>(null);
+    const [generatingVideos, setGeneratingVideos] = useState<Record<string, boolean>>({});
     const [adCampaign, setAdCampaign] = useState<AdCampaignRequest>({
         influencer_name: 'Luna AI',
         influencer_gender: 'female',
         influencer_look: 'Young Turkish woman, mid-20s, long dark hair, brown eyes, natural glowing makeup, warm confident smile',
         product_name: '',
         product_description: '',
-        brand_name: selectedClient?.company_name || '',
+        brand_name: selectedClient?.name || '',
+        ad_type: 'both',
         ad_goal: 'conversion',
         target_audience: '25-40 yaş arası, dijital ürünlere ilgi duyan',
+        language: 'tr',
         tone: 'samimi, güvenilir, bilgilendirici',
         cta: 'Hemen dene! 💫',
-        video_duration: 15,
-        video_aspect_ratio: '9:16'
+        influencer_image_url: undefined,
+        video_duration: '5',
+        video_model: 'kling-2.1-standard',
+        video_aspect_ratio: '9:16',
+        product_image_url: undefined,
+        location_image_url: undefined,
+        talking_script: ''
     });
+
+    const [isSavingToSheet, setIsSavingToSheet] = useState(false);
+    const [isLoadingFromSheet, setIsLoadingFromSheet] = useState(false);
+    const [sheetWebhookUrl, setSheetWebhookUrl] = useState(googleSheetsService.getWebhookUrl());
+    const [cloudHistory, setCloudHistory] = useState<SheetEntry[]>([]);
+    const [activeTab, setActiveTab] = useState<'local' | 'cloud'>('local');
 
     // Update brand name and product description when selected client or influencer prompt changes
     useEffect(() => {
@@ -197,7 +235,7 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
                 
                 return { 
                     ...prev, 
-                    brand_name: selectedClient.company_name,
+                    brand_name: selectedClient.name,
                     product_description: prev.product_description || brandInfo,
                     target_audience: prev.target_audience || (selectedClient.industry ? `${selectedClient.industry} ürünleriyle ilgilenen kitle` : prev.target_audience),
                     // influencer_look auto-updates from the current influencer generation prompt
@@ -220,7 +258,7 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
 
         const isConfigured = provider === 'fal' 
             ? aiInfluencerService.isConfigured() 
-            : higgsfieldService.isConfigured();
+            : mirakoService.isConfigured();
 
         if (!isConfigured) {
             setShowApiKeyModal(true);
@@ -248,17 +286,17 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
             };
             response = await aiInfluencerService.generateInfluencer(request);
         } else {
-            // Higgsfield
-            const higgsResponse = await higgsfieldService.generateImage({
+            // Mirako AI
+            const mirakoResponse = await mirakoService.generateImage({
                 prompt,
                 aspectRatio,
             });
             
             response = {
-                success: higgsResponse.success,
-                imageUrl: higgsResponse.videoUrl, // In Higgsfield response, the URL is in videoUrl even for images
-                error: higgsResponse.error,
-                requestId: higgsResponse.requestId
+                success: mirakoResponse.success,
+                imageUrl: mirakoResponse.videoUrl, // Mirako returns URL in videoUrl field for both images and videos in our response wrapper
+                error: mirakoResponse.error,
+                requestId: mirakoResponse.requestId
             };
         }
 
@@ -272,6 +310,22 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
             addNotification({ type: 'error', message: `❌ ${response.error}`, read: false });
         }
     }, [prompt, aspectRatio, model, addNotification, provider, selectedClient]);
+
+    const handleGenerateScript = useCallback(async () => {
+        setIsGeneratingScript(true);
+        addNotification({ type: 'info', message: '✍️ Konuşma metni hazırlanıyor...', read: false });
+        
+        try {
+            const context = selectedClient ? `${selectedClient.company_name} - ${selectedClient.industry}` : '';
+            const generatedScript = await llmService.generateTalkingScript(prompt, context);
+            setScript(generatedScript);
+            addNotification({ type: 'success', message: '✨ Video betiği başarıyla üretildi!', read: false });
+        } catch (error) {
+            addNotification({ type: 'error', message: '❌ Metin üretilemedi', read: false });
+        } finally {
+            setIsGeneratingScript(false);
+        }
+    }, [prompt, selectedClient, addNotification]);
 
     const handleAnimate = useCallback(async () => {
         if (!result?.imageUrl) return;
@@ -292,10 +346,11 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
                 script: script
             });
         } else {
-            // Use Higgsfield for image-to-video with the script as motion prompt
-            videoResponse = await higgsfieldService.generateVideo({
+            // Use Mirako for image-to-video
+            videoResponse = await mirakoService.generateVideo({
                 prompt: script,
                 imageUrl: result.imageUrl,
+                aspectRatio: aspectRatio,
             });
         }
 
@@ -303,10 +358,98 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
         if (videoResponse.success && videoResponse.videoUrl) {
             setAnimatedVideo(videoResponse.videoUrl);
             addNotification({ type: 'success', message: '✅ Video başarıyla oluşturuldu!', read: false });
+            
+            // Add to history
+            const videoEntry: InfluencerGenerationResponse = {
+                success: true,
+                imageUrl: result.imageUrl, // Use the base image as thumbnail
+                videoUrl: videoResponse.videoUrl,
+                type: 'video',
+                requestId: videoResponse.requestId || `video_${Date.now()}`
+            };
+            setHistory(prev => [videoEntry, ...prev].slice(0, 15));
+
+            // Buluta Kaydet (Otomatik)
+            googleSheetsService.saveToNamedSheet('influencer', {
+                date: new Date().toLocaleString('tr-TR'),
+                influencerName: adCampaign.influencer_name,
+                prompt: `Video Scripti: ${script}`,
+                imageUrl: videoResponse.videoUrl,
+                clientName: selectedClient?.name || 'Genel',
+                type: 'video',
+                metadata: {
+                    model: talkingProvider,
+                    aspectRatio,
+                    campaign: 'Talking Avatar'
+                }
+            }).then(resp => {
+                if (resp.success) addNotification({ type: 'success', message: '📊 Video Google Sheet\'e başarıyla yedeklendi!', read: false });
+            });
         } else {
             addNotification({ type: 'error', message: `❌ ${videoResponse.error}`, read: false });
         }
-    }, [result, script, addNotification, talkingProvider]);
+    }, [result, script, addNotification, talkingProvider, aspectRatio]);
+
+    const handleGenerateCampaignVideo = async (type: 'talking_head' | 'product' | 'lifestyle') => {
+        if (!campaignResult) return;
+
+        setGeneratingVideos(prev => ({ ...prev, [type]: true }));
+        addNotification({ type: 'info', message: `🎬 Kling AI ile ${type.replace('_', ' ')} videosu üretiliyor...`, read: false });
+
+        try {
+            let prompt = '';
+            let imageUrl = '';
+            let mode: 'text-to-video' | 'image-to-video' = 'text-to-video';
+
+            if (type === 'talking_head' && campaignResult.talking_head_ad) {
+                prompt = campaignResult.talking_head_ad.script.full_script;
+                imageUrl = campaignResult.talking_head_ad.source_image;
+                mode = 'image-to-video';
+            } else if (type === 'product' && campaignResult.product_ad) {
+                prompt = campaignResult.product_ad.info.scene;
+                imageUrl = campaignResult.product_ad.source_image;
+                mode = 'image-to-video';
+            } else if (type === 'lifestyle' && campaignResult.lifestyle_ad) {
+                prompt = `Beautiful cinematic lifestyle shot for ${campaignResult.brand}'s ${campaignResult.product}`;
+                imageUrl = campaignResult.lifestyle_ad.source_image;
+                mode = 'image-to-video';
+            }
+
+            const request = {
+                prompt,
+                imageUrl,
+                aspectRatio: adCampaign.video_aspect_ratio as '16:9' | '9:16' | '1:1' | '4:3',
+                duration: parseInt(adCampaign.video_duration) || 5
+            };
+
+            let response;
+            if (mode === 'image-to-video') {
+                response = await ltxVideoService.generateFromImage(request);
+            } else {
+                response = await ltxVideoService.generateFromText(request);
+            }
+
+            if (response.success && response.videoUrl) {
+                // Update campaign result
+                setCampaignResult(prev => {
+                    if (!prev) return null;
+                    const newAllVideos = { 
+                        ...prev.all_videos, 
+                        [type]: (response.videoUrl as string) || null 
+                    };
+                    return { ...prev, all_videos: newAllVideos } as AdCampaignResponse;
+                });
+                addNotification({ type: 'success', message: `✅ ${type.replace('_', ' ')} videosu hazır!`, read: false });
+            } else {
+                throw new Error(response.error || 'Video üretilemedi');
+            }
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            addNotification({ type: 'error', message: `❌ Video hatası: ${errorMessage}`, read: false });
+        } finally {
+            setGeneratingVideos(prev => ({ ...prev, [type]: false }));
+        }
+    };
 
     // n99 AI Influencer Ads Campaign Handler
     const handleCreateAdCampaign = useCallback(async () => {
@@ -317,22 +460,24 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
 
         setIsCreatingCampaign(true);
         setCampaignResult(null);
+        
+        // Ensure the current result image is passed if not explicitly set
+        const selectedImageUrl = adCampaign.influencer_image_url || result?.imageUrl;
+
         addNotification({ type: 'info', message: '🎬 AI Influencer reklam kampanyası oluşturuluyor... Bu işlem 2-5 dakika sürebilir.', read: false });
 
         try {
-            const response = await fetch(N99_AI_INFLUENCER_WEBHOOK, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(adCampaign),
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data: AdCampaignResponse = await response.json();
+            const data = (await campaignService.createCampaign({
+                brand_name: adCampaign.brand_name,
+                product_name: adCampaign.product_name,
+                product_description: adCampaign.product_description,
+                influencer_name: adCampaign.influencer_name,
+                target_audience: adCampaign.target_audience,
+                tone: adCampaign.tone,
+                cta: adCampaign.cta,
+                influencer_look: adCampaign.influencer_look,
+                influencer_image_url: selectedImageUrl
+            })) as AdCampaignResponse;
             
             setIsCreatingCampaign(false);
             setCampaignResult(data);
@@ -340,9 +485,26 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
             if (data.success) {
                 addNotification({ 
                     type: 'success', 
-                    message: `✅ Reklam kampanyası başarıyla oluşturuldu! ${data.images ? '4 görsel' : ''} ${data.videos ? '+ 3 video' : ''} hazır.`, 
+                    message: `✅ Reklam kampanyası başarıyla oluşturuldu! ${data.all_images ? '4 görsel' : ''} ${data.all_videos ? '+ 3 video' : ''} hazır.`, 
                     read: false 
                 });
+
+                // Buluta Kaydet (Otomatik)
+                if (data.talking_head_ad?.script?.full_script) {
+                    googleSheetsService.saveToNamedSheet('influencer', {
+                        date: new Date().toLocaleString('tr-TR'),
+                        influencerName: data.influencer || adCampaign.influencer_name,
+                        prompt: `Video Senaryosu: ${data.talking_head_ad.script.full_script}`,
+                        imageUrl: data.talking_head_ad.video_url || result?.imageUrl || '',
+                        clientName: selectedClient?.name || 'Genel',
+                        type: 'video',
+                        metadata: {
+                            model: adCampaign.video_model,
+                            aspectRatio: adCampaign.video_aspect_ratio,
+                            campaign: 'Reklam Kampanyası'
+                        }
+                    });
+                }
             } else {
                 addNotification({ type: 'error', message: `❌ ${data.error || 'Kampanya oluşturulamadı'}`, read: false });
             }
@@ -352,7 +514,54 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
             addNotification({ type: 'error', message: `❌ Kampanya hatası: ${errorMessage}`, read: false });
             setCampaignResult({ success: false, error: errorMessage });
         }
-    }, [adCampaign, addNotification]);
+    }, [adCampaign, addNotification, result?.imageUrl, selectedClient?.name]);
+
+    const handleSaveToSheet = useCallback(async () => {
+        const urlToSave = animatedVideo || result?.imageUrl;
+        if (!urlToSave) return;
+
+        setIsSavingToSheet(true);
+        const entry: SheetEntry = {
+            date: new Date().toLocaleString('tr-TR'),
+            influencerName: adCampaign.influencer_name,
+            prompt: animatedVideo ? `Video Scripti: ${script}` : prompt,
+            imageUrl: urlToSave,
+            clientName: selectedClient?.name || 'Genel',
+            type: animatedVideo ? 'video' : 'image',
+            metadata: {
+                model: animatedVideo ? talkingProvider : model,
+                aspectRatio,
+                provider
+            }
+        };
+
+        const response = await googleSheetsService.saveToNamedSheet('influencer', entry);
+        setIsSavingToSheet(false);
+
+        if (response.success) {
+            addNotification({ type: 'success', message: `📊 ${animatedVideo ? 'Video' : 'Görsel'} Google Sheet'e başarıyla kaydedildi!`, read: false });
+        } else {
+            addNotification({ type: 'error', message: `❌ Kayıt hatası: ${response.error}`, read: false });
+            if (!googleSheetsService.isConfigured()) {
+                setShowApiKeyModal(true);
+            }
+        }
+    }, [result, animatedVideo, script, adCampaign.influencer_name, prompt, selectedClient, model, aspectRatio, provider, talkingProvider, addNotification]);
+
+    const handleFetchFromSheet = useCallback(async () => {
+        setIsLoadingFromSheet(true);
+        try {
+            const data = await googleSheetsService.fetchData('influencer');
+            setCloudHistory(data);
+            setActiveTab('cloud');
+            addNotification({ type: 'success', message: '📊 Google Sheet verileri başarıyla çekildi!', read: false });
+        } catch (error) {
+            console.error('Fetch error:', error);
+            addNotification({ type: 'error', message: '❌ Veriler çekilemedi. Webhook URL\'nizi kontrol edin.', read: false });
+        } finally {
+            setIsLoadingFromSheet(false);
+        }
+    }, [addNotification]);
 
     const personaTemplates = [
         { name: 'Moda İkonu', style: 'fashion influencer wearing elegant designer clothes', location: 'Milan street' },
@@ -393,7 +602,7 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
                     <button
                         className="btn btn-ghost btn-icon"
                         onClick={() => {
-                            setApiKey(provider === 'fal' ? aiInfluencerService.getApiKey() : higgsfieldService.getApiKey());
+                            setApiKey(provider === 'fal' ? aiInfluencerService.getApiKey() : mirakoService.getApiKey());
                             setShowApiKeyModal(true);
                         }}
                         title="API Ayarları"
@@ -417,11 +626,11 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
                                 <span>fal.ai (Flux)</span>
                             </button>
                             <button
-                                className={`btn ${provider === 'higgsfield' ? 'btn-primary' : 'btn-ghost'}`}
-                                onClick={() => setProvider('higgsfield')}
+                                className={`btn ${provider === 'mirako' ? 'btn-primary' : 'btn-ghost'}`}
+                                onClick={() => setProvider('mirako')}
                                 style={{ flex: 1, fontSize: '0.8rem' }}
                             >
-                                <span>Higgsfield</span>
+                                <span>Mirako AI</span>
                             </button>
                         </div>
                     </div>
@@ -559,7 +768,7 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
                                     className="input select"
                                     value={model}
                                     onChange={(e) => setModel(e.target.value as 'flux-pro' | 'flux-schnell')}
-                                    disabled={provider === 'higgsfield'}
+                                    disabled={provider === 'mirako'}
                                 >
                                     {provider === 'fal' ? (
                                         <>
@@ -567,7 +776,7 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
                                             <option value="flux-pro">Ultra Kalite (Pro)</option>
                                         </>
                                     ) : (
-                                        <option value="flux-pro">Higgsfield Soul</option>
+                                        <option value="flux-pro">Mirako AI Soul</option>
                                     )}
                                 </select>
                             </div>
@@ -638,7 +847,7 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
                                 <p className="text-muted" style={{ fontWeight: 500 }}>
                                     {isGenerating ? 'AI karakteri hayal ediyor...' : 'Karakter konuşturuluyor, lütfen bekleyin...'}
                                 </p>
-                                <p className="text-xs text-muted mt-sm">Fal.ai sunucuları meşgul olabilir (30-60 sn sürebilir)</p>
+                                <p className="text-xs text-muted mt-sm">Mirako AI sunucuları meşgul olabilir (30-60 sn sürebilir)</p>
                             </div>
                         ) : animatedVideo ? (
                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -650,11 +859,44 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
                                     style={{ width: '100%', borderRadius: 'var(--radius-lg)', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}
                                 />
                                 <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginTop: 'var(--spacing-lg)' }}>
-                                    <a href={animatedVideo} download className="btn btn-primary btn-full">
-                                        <Download size={18} /> Videoyu İndir
+                                    <a href={animatedVideo} target="_blank" download className="btn btn-secondary" style={{ flex: 1 }}>
+                                        <Download size={18} /> İndir
                                     </a>
-                                    <button className="btn btn-secondary" onClick={() => setAnimatedVideo(null)}>
-                                        <RefreshCw size={18} /> Görsele Dön
+                                    <button 
+                                        className="btn btn-primary" 
+                                        onClick={() => {
+                                            setAdCampaign(prev => ({ ...prev, influencer_image_url: animatedVideo }));
+                                            setShowAdCampaignModal(true);
+                                        }}
+                                        style={{ 
+                                            flex: 2,
+                                            background: 'linear-gradient(135deg, #f43f5e 0%, #ec4899 100%)',
+                                        }}
+                                    >
+                                        <Megaphone size={18} /> Bu Videoyla Reklam Yap
+                                    </button>
+                                    <button 
+                                        className="btn btn-secondary" 
+                                        onClick={handleSaveToSheet}
+                                        disabled={isSavingToSheet}
+                                        title="Google Sheets'e Kaydet"
+                                        style={{ 
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '4px',
+                                            padding: '8px'
+                                        }}
+                                    >
+                                        {isSavingToSheet ? <Loader2 size={18} className="spin" /> : <FileText size={18} />}
+                                        <span className="text-xs">Sheet</span>
+                                    </button>
+                                    <button 
+                                        className="btn btn-ghost btn-icon" 
+                                        onClick={() => setAnimatedVideo(null)}
+                                        title="Görsele Dön"
+                                    >
+                                        <RefreshCw size={18} />
                                     </button>
                                 </div>
                             </div>
@@ -667,9 +909,38 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', gap: 'var(--spacing-sm)', marginTop: 'var(--spacing-lg)' }}>
-                                    <a href={result.imageUrl} target="_blank" className="btn btn-primary btn-full" rel="noopener noreferrer">
-                                        <Download size={18} /> Görseli İndir
+                                    <a href={result.imageUrl} target="_blank" className="btn btn-secondary" rel="noopener noreferrer" style={{ flex: 1 }}>
+                                        <Download size={18} /> İndir
                                     </a>
+                                    <button 
+                                        className="btn btn-primary" 
+                                        onClick={() => {
+                                            setAdCampaign(prev => ({ ...prev, influencer_image_url: result.imageUrl }));
+                                            setShowAdCampaignModal(true);
+                                        }}
+                                        style={{ 
+                                            flex: 2,
+                                            background: 'linear-gradient(135deg, #f43f5e 0%, #ec4899 100%)',
+                                        }}
+                                    >
+                                        <Megaphone size={18} /> Bu Görselle Reklam Yap
+                                    </button>
+                                    <button 
+                                        className="btn btn-secondary" 
+                                        onClick={handleSaveToSheet}
+                                        disabled={isSavingToSheet}
+                                        title="Google Sheets'e Kaydet"
+                                        style={{ 
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '4px',
+                                            padding: '8px'
+                                        }}
+                                    >
+                                        {isSavingToSheet ? <Loader2 size={18} className="spin" /> : <FileText size={18} />}
+                                        <span className="text-xs">Sheet</span>
+                                    </button>
                                 </div>
                             </div>
                         ) : result?.error ? (
@@ -689,14 +960,67 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
 
                 {/* Column 3: History & Tools */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)' }}>
-                        {/* History */}
-                    {history.length > 0 && (
-                        <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
-                            <h3 className="card-title mb-md" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Hash size={16} /> Kütüphane
-                            </h3>
+                    {/* History Tabs */}
+                    <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+                        <div style={{ display: 'flex', gap: 'var(--spacing-xs)', marginBottom: 'var(--spacing-md)', borderBottom: '1px solid var(--border-color)', paddingBottom: 'var(--spacing-sm)' }}>
+                            <button 
+                                onClick={() => setActiveTab('local')}
+                                style={{ 
+                                    padding: '4px 8px', 
+                                    borderRadius: 'var(--radius-sm)',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 600,
+                                    background: activeTab === 'local' ? 'var(--accent-primary)' : 'transparent',
+                                    color: activeTab === 'local' ? 'white' : 'var(--text-muted)',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    flex: 1
+                                }}
+                            >
+                                Yerel
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    setActiveTab('cloud');
+                                    if (cloudHistory.length === 0) handleFetchFromSheet();
+                                }}
+                                style={{ 
+                                    padding: '4px 8px', 
+                                    borderRadius: 'var(--radius-sm)',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 600,
+                                    background: activeTab === 'cloud' ? 'var(--accent-primary)' : 'transparent',
+                                    color: activeTab === 'cloud' ? 'white' : 'var(--text-muted)',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '4px',
+                                    flex: 1
+                                }}
+                            >
+                                Bulut {isLoadingFromSheet && <Loader2 size={10} className="spin" />}
+                            </button>
+                            <button 
+                                onClick={handleFetchFromSheet}
+                                disabled={isLoadingFromSheet}
+                                style={{ 
+                                    padding: '0 4px',
+                                    background: 'none',
+                                    border: 'none',
+                                    color: 'var(--text-muted)',
+                                    cursor: 'pointer'
+                                }}
+                                title="Yenile"
+                            >
+                                <RefreshCw size={12} className={isLoadingFromSheet ? 'spin' : ''} />
+                            </button>
+                        </div>
+
+                        {activeTab === 'local' ? (
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--spacing-sm)' }}>
-                                {history.map((h, i) => (
+                                {history.length > 0 ? history.map((h, i) => (
                                     <div 
                                         key={i} 
                                         style={{ 
@@ -707,41 +1031,62 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
                                             border: result?.imageUrl === h.imageUrl ? '2px solid var(--accent-primary)' : 'none',
                                             position: 'relative',
                                         }}
-                                        className="library-item"
                                         onClick={() => {
-                                            setResult(h);
-                                            setAnimatedVideo(null);
+                                            if (h.type === 'video' || h.videoUrl) {
+                                                setResult({ success: true, imageUrl: h.imageUrl });
+                                                setAnimatedVideo(h.videoUrl || null);
+                                            } else {
+                                                setResult(h);
+                                                setAnimatedVideo(null);
+                                            }
                                         }}
                                     >
                                         <img src={h.imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                        <button 
-                                            className="btn-delete"
-                                            onClick={(e) => handleDeleteFromHistory(h.requestId, e)}
-                                            style={{
-                                                position: 'absolute',
-                                                top: '4px',
-                                                right: '4px',
-                                                padding: '4px',
-                                                borderRadius: '50%',
-                                                background: 'rgba(0,0,0,0.5)',
-                                                color: 'white',
-                                                border: 'none',
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                opacity: 0.8,
-                                                zIndex: 10
-                                            }}
-                                            title="Sil"
-                                        >
-                                            <X size={12} />
-                                        </button>
+                                        {(h.type === 'video' || h.videoUrl) && (
+                                            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'rgba(99, 102, 241, 0.8)', borderRadius: '50%', padding: '4px' }}>
+                                                <Play size={16} color="white" fill="white" />
+                                            </div>
+                                        )}
                                     </div>
-                                ))}
+                                )) : (
+                                    <div style={{ gridColumn: 'span 2', textAlign: 'center', padding: 'var(--spacing-md)', color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+                                        Yerel geçmiş yok.
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                    )}
+                        ) : (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--spacing-sm)' }}>
+                                {cloudHistory.length > 0 ? cloudHistory.map((h, i) => (
+                                    <div 
+                                        key={i} 
+                                        style={{ 
+                                            aspectRatio: '1', 
+                                            borderRadius: 'var(--radius-sm)', 
+                                            overflow: 'hidden',
+                                            cursor: 'pointer',
+                                            border: result?.imageUrl === h.imageUrl ? '2px solid var(--accent-primary)' : 'none',
+                                            position: 'relative',
+                                        }}
+                                        onClick={() => {
+                                            if (h.imageUrl) {
+                                                setResult({ success: true, imageUrl: h.imageUrl });
+                                                if (h.prompt) setPrompt(h.prompt);
+                                                if (h.influencerName) setAdCampaign(prev => ({ ...prev, influencer_name: h.influencerName || prev.influencer_name }));
+                                                setAnimatedVideo(null);
+                                            }
+                                        }}
+                                        title={`${h.influencerName}\n${h.prompt}`}
+                                    >
+                                        <img src={h.imageUrl} alt={`Cloud ${i}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    </div>
+                                )) : (
+                                    <div style={{ gridColumn: 'span 2', textAlign: 'center', padding: 'var(--spacing-md)', color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+                                        {isLoadingFromSheet ? 'Yükleniyor...' : 'Bulutta görsel yok.'}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
 
                     {/* Animation Section */}
                     {result?.success && (
@@ -762,20 +1107,45 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
                                     SadTalker
                                 </button>
                                 <button
-                                    className={`btn btn-sm ${talkingProvider === 'higgsfield' ? 'btn-primary' : 'btn-ghost'}`}
-                                    onClick={() => setTalkingProvider('higgsfield')}
+                                    className={`btn btn-sm ${talkingProvider === 'mirako' ? 'btn-primary' : 'btn-ghost'}`}
+                                    onClick={() => setTalkingProvider('mirako')}
                                     style={{ flex: 1, fontSize: '0.7rem' }}
                                 >
-                                    Higgsfield
+                                    Mirako AI
                                 </button>
                             </div>
                             
                             <div className="input-group" style={{ marginBottom: 'var(--spacing-lg)' }}>
-
-                                <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <MessageSquare size={14} />
-                                    Konuşma Metni (Script)
-                                </label>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-xs)' }}>
+                                    <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: 0 }}>
+                                        <MessageSquare size={14} />
+                                        Konuşma Metni (Script)
+                                    </label>
+                                    <button 
+                                        className="btn btn-ghost btn-sm"
+                                        onClick={handleGenerateScript}
+                                        disabled={isGeneratingScript || !prompt}
+                                        style={{ 
+                                            fontSize: '0.7rem', 
+                                            height: '24px', 
+                                            padding: '0 8px',
+                                            color: 'var(--accent-primary)',
+                                            background: 'var(--accent-soft)',
+                                            border: '1px solid var(--accent-soft-border)',
+                                            borderRadius: 'var(--radius-full)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px'
+                                        }}
+                                    >
+                                        {isGeneratingScript ? (
+                                            <Loader2 size={12} className="spin" />
+                                        ) : (
+                                            <Sparkles size={12} />
+                                        )}
+                                        <span>AI Yazsın</span>
+                                    </button>
+                                </div>
                                 <textarea 
                                     className="input"
                                     rows={3}
@@ -849,7 +1219,7 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
                                 </div>
                                 <div>
                                     <h2 className="modal-title" style={{ marginBottom: '4px' }}>AI Influencer Reklam Kampanyası</h2>
-                                    <p className="text-xs text-muted">GPT-4o + Fal.ai + Higgsfield ile otomatik reklam üretimi</p>
+                                    <p className="text-xs text-muted">GPT-4o + Mirako AI + Kling 2.1 ile otomatik reklam üretimi</p>
                                 </div>
                             </div>
                             <button 
@@ -960,6 +1330,112 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
                                                 disabled={isCreatingCampaign}
                                             />
                                         </div>
+
+                                        <div className="input-group" style={{ marginTop: 'var(--spacing-md)' }}>
+                                            <label className="input-label">Konuşma Metni / Video Scripti</label>
+                                            <textarea
+                                                className="input"
+                                                rows={3}
+                                                placeholder="Influencer ne söylesin? (Boş bırakılırsa AI üretir)"
+                                                value={adCampaign.talking_script}
+                                                onChange={(e) => setAdCampaign({...adCampaign, talking_script: e.target.value})}
+                                                disabled={isCreatingCampaign}
+                                            />
+                                        </div>
+
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-md)', marginTop: 'var(--spacing-md)' }}>
+                                            <div className="input-group">
+                                                <label className="input-label">Ürün Fotoğrafı</label>
+                                                <div style={{ position: 'relative' }}>
+                                                    <input 
+                                                        type="file" 
+                                                        accept="image/*"
+                                                        onChange={(e) => {
+                                                            const file = e.target.files?.[0];
+                                                            if (file) {
+                                                                const reader = new FileReader();
+                                                                reader.onload = (ev) => setAdCampaign(prev => ({ ...prev, product_image_url: ev.target?.result as string }));
+                                                                reader.readAsDataURL(file);
+                                                            }
+                                                        }}
+                                                        style={{ display: 'none' }}
+                                                        id="product-img-upload"
+                                                    />
+                                                    <label 
+                                                        htmlFor="product-img-upload"
+                                                        style={{ 
+                                                            display: 'flex', 
+                                                            alignItems: 'center', 
+                                                            gap: '8px', 
+                                                            padding: '8px 12px', 
+                                                            background: 'var(--bg-secondary)', 
+                                                            borderRadius: 'var(--radius-sm)', 
+                                                            cursor: 'pointer',
+                                                            border: adCampaign.product_image_url ? '1px solid var(--success)' : '1px solid var(--border-color)',
+                                                            fontSize: '0.75rem'
+                                                        }}
+                                                    >
+                                                        <Image size={14} /> {adCampaign.product_image_url ? 'Değiştir (Yüklendi)' : 'Ürün Yükle'}
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div className="input-group">
+                                                <label className="input-label">Mekan Fotoğrafı</label>
+                                                <div style={{ position: 'relative' }}>
+                                                    <input 
+                                                        type="file" 
+                                                        accept="image/*"
+                                                        onChange={(e) => {
+                                                            const file = e.target.files?.[0];
+                                                            if (file) {
+                                                                const reader = new FileReader();
+                                                                reader.onload = (ev) => setAdCampaign(prev => ({ ...prev, location_image_url: ev.target?.result as string }));
+                                                                reader.readAsDataURL(file);
+                                                            }
+                                                        }}
+                                                        style={{ display: 'none' }}
+                                                        id="location-img-upload"
+                                                    />
+                                                    <label 
+                                                        htmlFor="location-img-upload"
+                                                        style={{ 
+                                                            display: 'flex', 
+                                                            alignItems: 'center', 
+                                                            gap: '8px', 
+                                                            padding: '8px 12px', 
+                                                            background: 'var(--bg-secondary)', 
+                                                            borderRadius: 'var(--radius-sm)', 
+                                                            cursor: 'pointer',
+                                                            border: adCampaign.location_image_url ? '1px solid var(--success)' : '1px solid var(--border-color)',
+                                                            fontSize: '0.75rem'
+                                                        }}
+                                                    >
+                                                        <Image size={14} /> {adCampaign.location_image_url ? 'Değiştir (Yüklendi)' : 'Mekan Yükle'}
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {(adCampaign.influencer_image_url || result?.imageUrl) && (
+                                            <div style={{ marginTop: 'var(--spacing-md)', display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--bg-tertiary)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--accent-primary)' }}>
+                                                <img 
+                                                    src={adCampaign.influencer_image_url || result?.imageUrl} 
+                                                    alt="Selected source" 
+                                                    style={{ width: '60px', height: '60px', borderRadius: 'var(--radius-sm)', objectFit: 'cover' }}
+                                                />
+                                                <div>
+                                                    <p className="text-xs font-bold" style={{ color: 'var(--accent-primary)' }}>Seçili Karakter Görseli Kullanılacak</p>
+                                                    <p className="text-xs text-muted">Bu görsel reklamın ana karakteri olacak.</p>
+                                                </div>
+                                                <button 
+                                                    className="btn btn-ghost btn-xs" 
+                                                    style={{ marginLeft: 'auto' }}
+                                                    onClick={() => setAdCampaign(prev => ({ ...prev, influencer_image_url: undefined }))}
+                                                >
+                                                    Değiştir
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Reklam Ayarları */}
@@ -969,6 +1445,19 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
                                             Reklam Ayarları
                                         </h3>
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--spacing-md)' }}>
+                                            <div className="input-group">
+                                                <label className="input-label">Reklam Türü</label>
+                                                <select
+                                                    className="input select"
+                                                    value={adCampaign.ad_type}
+                                                    onChange={(e) => setAdCampaign({...adCampaign, ad_type: e.target.value as 'both' | 'talking_head' | 'product_showcase'})}
+                                                    disabled={isCreatingCampaign}
+                                                >
+                                                    <option value="both">Her İkisi</option>
+                                                    <option value="talking_head">Konuşma Videosu</option>
+                                                    <option value="product_showcase">Ürün Tanıtım</option>
+                                                </select>
+                                            </div>
                                             <div className="input-group">
                                                 <label className="input-label">Reklam Amacı</label>
                                                 <select
@@ -983,16 +1472,43 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
                                                 </select>
                                             </div>
                                             <div className="input-group">
+                                                <label className="input-label">Dil</label>
+                                                <select
+                                                    className="input select"
+                                                    value={adCampaign.language}
+                                                    onChange={(e) => setAdCampaign({...adCampaign, language: e.target.value as 'tr' | 'en'})}
+                                                    disabled={isCreatingCampaign}
+                                                >
+                                                    <option value="tr">Türkçe</option>
+                                                    <option value="en">English</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--spacing-md)', marginTop: 'var(--spacing-md)' }}>
+                                            <div className="input-group">
+                                                <label className="input-label">Video Modeli</label>
+                                                <select
+                                                    className="input select"
+                                                    value={adCampaign.video_model}
+                                                    onChange={(e) => setAdCampaign({...adCampaign, video_model: e.target.value})}
+                                                    disabled={isCreatingCampaign}
+                                                >
+                                                    <option value="kling-2.1-standard">Kling 2.1 Standard</option>
+                                                    <option value="kling-2.1-pro">Kling 2.1 Pro</option>
+                                                    <option value="minimax-hailuo">Minimax Hailuo</option>
+                                                    <option value="wan-2.1">Wan 2.1</option>
+                                                </select>
+                                            </div>
+                                            <div className="input-group">
                                                 <label className="input-label">Video Süresi</label>
                                                 <select
                                                     className="input select"
                                                     value={adCampaign.video_duration}
-                                                    onChange={(e) => setAdCampaign({...adCampaign, video_duration: parseInt(e.target.value)})}
+                                                    onChange={(e) => setAdCampaign({...adCampaign, video_duration: e.target.value})}
                                                     disabled={isCreatingCampaign}
                                                 >
-                                                    <option value={10}>10 saniye</option>
-                                                    <option value={15}>15 saniye</option>
-                                                    <option value={30}>30 saniye</option>
+                                                    <option value="5">5 saniye</option>
+                                                    <option value="10">10 saniye</option>
                                                 </select>
                                             </div>
                                             <div className="input-group">
@@ -1082,19 +1598,38 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
                                                     <div style={{ background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', padding: 'var(--spacing-md)' }}>
                                                         <p><strong>Tema:</strong> {campaignResult.ad_concept.theme}</p>
                                                         <p><strong>Hook:</strong> {campaignResult.ad_concept.hook}</p>
-                                                        <p><strong>USP:</strong> {campaignResult.ad_concept.unique_selling_point}</p>
+                                                        <p><strong>USP:</strong> {campaignResult.ad_concept.usp}</p>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Talking Head Script */}
+                                            {campaignResult.talking_head_ad?.script && (
+                                                <div style={{ marginBottom: 'var(--spacing-xl)' }}>
+                                                    <h4 style={{ marginBottom: 'var(--spacing-md)', fontWeight: 600 }}>🎬 Reklam Senaryosu</h4>
+                                                    <div style={{ background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', padding: 'var(--spacing-md)' }}>
+                                                        <p className="text-sm" style={{ whiteSpace: 'pre-wrap', marginBottom: 'var(--spacing-md)' }}>{campaignResult.talking_head_ad.script.full_script}</p>
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                            {campaignResult.talking_head_ad.script.sections.map((s, i) => (
+                                                                <div key={i} style={{ display: 'flex', gap: '12px', fontSize: '0.8rem' }}>
+                                                                    <span style={{ color: 'var(--accent-primary)', fontWeight: 600, minWidth: '50px' }}>{s.time}</span>
+                                                                    <span>{s.text}</span>
+                                                                    <span className="text-muted" style={{ marginLeft: 'auto' }}>{s.emotion}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             )}
 
                                             {/* Görseller */}
-                                            {campaignResult.images && (
+                                            {campaignResult.all_images && (
                                                 <div style={{ marginBottom: 'var(--spacing-xl)' }}>
                                                     <h4 style={{ marginBottom: 'var(--spacing-md)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                         <Image size={18} /> Üretilen Görseller
                                                     </h4>
                                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--spacing-sm)' }}>
-                                                        {Object.entries(campaignResult.images).map(([key, url]) => (
+                                                        {Object.entries(campaignResult.all_images).filter(([, url]) => url).map(([key, url]) => (
                                                             <a key={key} href={url} target="_blank" rel="noopener noreferrer" style={{ display: 'block' }}>
                                                                 <img 
                                                                     src={url} 
@@ -1114,50 +1649,81 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
                                             )}
 
                                             {/* Videolar */}
-                                            {campaignResult.videos && (
+                                            {campaignResult.all_videos && (
                                                 <div style={{ marginBottom: 'var(--spacing-xl)' }}>
                                                     <h4 style={{ marginBottom: 'var(--spacing-md)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                         <Film size={18} /> Üretilen Videolar
                                                     </h4>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--spacing-md)' }}>
-                                                        {Object.entries(campaignResult.videos).map(([key, url]) => (
-                                                            <div key={key}>
-                                                                {typeof url === 'string' ? (
-                                                                    <video 
-                                                                        src={url} 
-                                                                        controls 
-                                                                        style={{ 
-                                                                            width: '100%', 
-                                                                            borderRadius: 'var(--radius-md)' 
-                                                                        }} 
-                                                                    />
-                                                                ) : (
-                                                                    <div style={{ 
-                                                                        background: 'var(--bg-tertiary)', 
-                                                                        borderRadius: 'var(--radius-md)', 
-                                                                        padding: 'var(--spacing-lg)', 
-                                                                        textAlign: 'center' 
-                                                                    }}>
-                                                                        <Loader2 size={24} className="spin" />
-                                                                        <p className="text-xs text-muted mt-sm">İşleniyor...</p>
-                                                                    </div>
-                                                                )}
-                                                                <p className="text-xs text-muted text-center mt-xs">{key.replace(/_/g, ' ')}</p>
-                                                            </div>
-                                                        ))}
-                                                    </div>
+                                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--spacing-md)' }}>
+                                                         {Object.entries(campaignResult.all_videos).map(([key, url]) => (
+                                                             <div key={key}>
+                                                                 {url && typeof url === 'string' ? (
+                                                                     <video 
+                                                                         src={url} 
+                                                                         controls 
+                                                                         style={{ 
+                                                                             width: '100%', 
+                                                                             borderRadius: 'var(--radius-md)' 
+                                                                         }} 
+                                                                     />
+                                                                 ) : (
+                                                                     <div style={{ 
+                                                                         background: 'var(--bg-tertiary)', 
+                                                                         borderRadius: 'var(--radius-md)', 
+                                                                         padding: 'var(--spacing-lg)', 
+                                                                         textAlign: 'center',
+                                                                         aspectRatio: '9/16',
+                                                                         display: 'flex',
+                                                                         flexDirection: 'column',
+                                                                         alignItems: 'center',
+                                                                         justifyContent: 'center'
+                                                                     }}>
+                                                                         <Video size={24} className={generatingVideos[key] ? 'spin' : ''} color={generatingVideos[key] ? 'var(--accent-primary)' : 'var(--text-muted)'} />
+                                                                         <p className="text-xs text-muted mt-sm">{generatingVideos[key] ? 'Üretiliyor...' : 'Video üretilmedi'}</p>
+                                                                         {!generatingVideos[key] && (
+                                                                             <button 
+                                                                                className="btn btn-primary btn-sm mt-md"
+                                                                                onClick={() => handleGenerateCampaignVideo(key as 'talking_head' | 'product' | 'lifestyle')}
+                                                                                style={{ padding: '4px 8px', fontSize: '0.7rem' }}
+                                                                             >
+                                                                                Video Üret
+                                                                             </button>
+                                                                         )}
+                                                                     </div>
+                                                                 )}
+                                                                 <p className="text-xs text-muted text-center mt-xs">{key.replace(/_/g, ' ')}</p>
+                                                             </div>
+                                                         ))}
+                                                     </div>
                                                 </div>
                                             )}
 
                                             {/* Instagram İçeriği */}
-                                            {campaignResult.instagram?.reel && (
+                                            {campaignResult.instagram && (
                                                 <div>
                                                     <h4 style={{ marginBottom: 'var(--spacing-md)', fontWeight: 600 }}>📱 Instagram İçeriği</h4>
                                                     <div style={{ background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', padding: 'var(--spacing-md)' }}>
                                                         <p className="text-sm" style={{ marginBottom: 'var(--spacing-sm)' }}><strong>Caption:</strong></p>
-                                                        <p className="text-sm" style={{ whiteSpace: 'pre-wrap', marginBottom: 'var(--spacing-md)' }}>{campaignResult.instagram.reel.caption}</p>
-                                                        <p className="text-xs text-muted">{campaignResult.instagram.reel.hashtags}</p>
-                                                        <p className="text-xs text-muted mt-sm">🕐 {campaignResult.instagram.reel.best_posting_time}</p>
+                                                        <p className="text-sm" style={{ whiteSpace: 'pre-wrap', marginBottom: 'var(--spacing-md)' }}>{campaignResult.instagram.caption}</p>
+                                                        <p className="text-xs" style={{ color: 'var(--accent-primary)' }}>{campaignResult.instagram.hashtags}</p>
+                                                        {campaignResult.instagram.cover_text && (
+                                                            <p className="text-xs text-muted mt-sm">📋 Kapak: {campaignResult.instagram.cover_text}</p>
+                                                        )}
+                                                        <p className="text-xs text-muted mt-sm">🕐 Önerilen Paylaşım: {campaignResult.instagram.posting_time}</p>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* A/B Test Hooks */}
+                                            {campaignResult.ab_test_hooks && campaignResult.ab_test_hooks.length > 0 && (
+                                                <div style={{ marginTop: 'var(--spacing-xl)' }}>
+                                                    <h4 style={{ marginBottom: 'var(--spacing-md)', fontWeight: 600 }}>🧪 A/B Test Hook Alternatifleri</h4>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                        {campaignResult.ab_test_hooks.map((hook, i) => (
+                                                            <div key={i} style={{ background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', padding: 'var(--spacing-sm) var(--spacing-md)', fontSize: '0.875rem' }}>
+                                                                <strong>Hook {String.fromCharCode(65 + i)}:</strong> {hook}
+                                                            </div>
+                                                        ))}
                                                     </div>
                                                 </div>
                                             )}
@@ -1239,38 +1805,57 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
                     <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px' }}>
                         <div className="modal-header">
                             <h2 className="modal-title">
-                                {provider === 'fal' ? 'fal.ai' : 'Higgsfield'} API Ayarları
+                                {provider === 'fal' ? 'fal.ai' : 'Mirako AI'} API Ayarları
                             </h2>
                         </div>
                         <div className="modal-body">
                             <p className="text-sm text-muted" style={{ marginBottom: 'var(--spacing-md)' }}>
                                 {provider === 'fal' ? (
                                     <>
-                                        AI Influencer ve Video üretimi için fal.ai API anahtarı gereklidir.
+                                        Üretim için fal.ai API anahtarı gereklidir.
                                         <a href="https://fal.ai/dashboard/keys" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)' }}>
                                             {' '}Buradan{' '}
                                         </a>
-                                        yeni bir API anahtarı alabilirsiniz.
+                                        API anahtarı alabilirsiniz.
                                     </>
                                 ) : (
                                     <>
-                                        Higgsfield görsel üretimi için API anahtarı gereklidir.
-                                        <a href="https://platform.higgsfield.ai/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)' }}>
+                                        Mirako AI üretimi için API anahtarı gereklidir.
+                                        <a href="https://mirako.co/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)' }}>
                                             {' '}Buradan{' '}
                                         </a>
                                         API anahtarı alabilirsiniz.
                                     </>
                                 )}
                             </p>
-                            <div className="input-group">
+                            <div className="input-group" style={{ marginBottom: 'var(--spacing-lg)' }}>
                                 <label className="input-label">API Anahtarı</label>
                                 <input
                                     type="password"
                                     className="input"
-                                    placeholder={provider === 'fal' ? 'Key ID:Key Secret formatında' : 'ID:SECRET formatında'}
+                                    placeholder={provider === 'fal' ? 'fal-xxxx...' : 'mi_xxxx...'}
                                     value={apiKey}
                                     onChange={(e) => setApiKey(e.target.value)}
                                 />
+                            </div>
+
+                            <div style={{ marginTop: 'var(--spacing-xl)', paddingTop: 'var(--spacing-lg)', borderTop: '1px solid var(--border-color)' }}>
+                                <h3 className="card-title" style={{ fontSize: '0.9rem', marginBottom: 'var(--spacing-sm)' }}>
+                                    📊 Google Sheets Entegrasyonu
+                                </h3>
+                                <p className="text-xs text-muted" style={{ marginBottom: 'var(--spacing-md)' }}>
+                                    Görselleri doğrudan Google Sheet'e kaydetmek için Google Apps Script Web App URL'inizi buraya yapıştırın.
+                                </p>
+                                <div className="input-group">
+                                    <label className="input-label">Google Sheet Webhook URL</label>
+                                    <input
+                                        type="text"
+                                        className="input"
+                                        placeholder="https://script.google.com/macros/s/.../exec"
+                                        value={sheetWebhookUrl}
+                                        onChange={(e) => setSheetWebhookUrl(e.target.value)}
+                                    />
+                                </div>
                             </div>
                         </div>
                         <div className="modal-footer">
@@ -1281,10 +1866,11 @@ const AIInfluencerGenerator: React.FC<AIInfluencerGeneratorProps> = ({ selectedC
                                 if (provider === 'fal') {
                                     ltxVideoService.setApiKey(apiKey);
                                 } else {
-                                    higgsfieldService.setApiKey(apiKey);
+                                    mirakoService.setApiKey(apiKey);
                                 }
+                                googleSheetsService.setWebhookUrl(sheetWebhookUrl);
                                 setShowApiKeyModal(false);
-                                addNotification({ type: 'success', message: 'API anahtarı kaydedildi', read: false });
+                                addNotification({ type: 'success', message: 'Ayarlar başarıyla kaydedildi', read: false });
                             }}>
                                 Kaydet
                             </button>

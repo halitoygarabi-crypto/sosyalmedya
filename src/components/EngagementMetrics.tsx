@@ -4,6 +4,7 @@ import { mockSentiment, mockHashtags } from '../data/mockData';
 import { TrendingUp, Hash, MessageCircle, ThumbsUp, ThumbsDown, Minus } from 'lucide-react';
 import { formatNumber } from '../utils/helpers';
 import { useDashboard } from '../context/DashboardContext';
+import type { Post } from '../types';
 
 // Sentiment Analysis Card
 export const SentimentAnalysis: React.FC = () => {
@@ -144,7 +145,7 @@ export const HashtagPerformance: React.FC = () => {
 };
 
 // Top Performing Posts
-export const TopPerformingPosts: React.FC<{ posts: any[] }> = ({ posts }) => {
+export const TopPerformingPosts: React.FC<{ posts: Post[] }> = ({ posts }) => {
     const topPosts = [...posts]
         .filter((p) => p.status === 'posted')
         .sort((a, b) => {
@@ -293,7 +294,7 @@ export const AutomationControls: React.FC = () => {
                             <input
                                 type="checkbox"
                                 checked={automation.enabled}
-                                onChange={() => toggleAutomationSetting(automation.id as any)}
+                                onChange={() => toggleAutomationSetting(automation.id as keyof typeof automationSettings)}
                             />
                             <span className="toggle-slider" />
                         </label>

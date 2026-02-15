@@ -28,6 +28,7 @@ import ReportsSection from './components/ReportsSection';
 import IntegrationsManager from './components/IntegrationsManager';
 import VideoGenerator from './components/VideoGenerator';
 import AIInfluencerGenerator from './components/AIInfluencerGenerator';
+import ContentHistory from './components/ContentHistory';
 import { Filter, CheckCircle, AlertCircle, Clock, ExternalLink, Trash2 } from 'lucide-react';
 import { formatRelativeTime } from './utils/helpers';
 
@@ -252,6 +253,7 @@ const DashboardContent: React.FC = () => {
                     style={{ width: 'auto' }}
                   >
                     <option value="all">Tüm Durumlar</option>
+                    <option value="draft">Taslak</option>
                     <option value="scheduled">Planlandı</option>
                     <option value="posted">Gönderildi</option>
                     <option value="failed">Başarısız</option>
@@ -261,6 +263,15 @@ const DashboardContent: React.FC = () => {
               </div>
               <div className="card">
                 <PostList filter={selectedStatus === 'all' ? 'all' : selectedStatus} limit={20} />
+              </div>
+              <div style={{ marginTop: 'var(--spacing-lg)' }}>
+                <ContentHistory
+                  onUseContent={(content) => {
+                    setShowNewPostModal(true);
+                    // Content will be loaded when modal opens
+                    sessionStorage.setItem('prefill_content', JSON.stringify(content));
+                  }}
+                />
               </div>
             </>
           )}
@@ -506,13 +517,6 @@ const DashboardContent: React.FC = () => {
   );
 };
 
-const Dashboard: React.FC = () => {
-  return (
-    <DashboardProvider>
-      <DashboardContent />
-    </DashboardProvider>
-  );
-};
 
 // Role-based redirect component
 const RoleBasedRedirect: React.FC = () => {
@@ -551,57 +555,43 @@ const RoleBasedRedirect: React.FC = () => {
 };
 
 // Client Dashboard Wrapper
-const ClientDashboardWrapper: React.FC = () => {
-  return (
-    <DashboardProvider>
-      <ClientDashboard />
-    </DashboardProvider>
-  );
-};
-
-// Creator Dashboard Wrapper
-const CreatorDashboardWrapper: React.FC = () => {
-  return (
-    <DashboardProvider>
-      <CreatorDashboard />
-    </DashboardProvider>
-  );
-};
 
 
 const App: React.FC = () => {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/admin/login" element={<AdminLoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/admin" element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <Dashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/client" element={
-            <ProtectedRoute allowedRoles={['client']}>
-              <ClientDashboardWrapper />
-            </ProtectedRoute>
-          } />
-          <Route path="/creator" element={
-            <ProtectedRoute allowedRoles={['content_creator', 'admin']}>
-              <CreatorDashboardWrapper />
-            </ProtectedRoute>
-          } />
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <RoleBasedRedirect />
+        <DashboardProvider>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/admin/login" element={<AdminLoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/admin" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <DashboardContent />
               </ProtectedRoute>
-            }
-          />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            } />
+            <Route path="/client" element={
+              <ProtectedRoute allowedRoles={['client']}>
+                <ClientDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/creator" element={
+              <ProtectedRoute allowedRoles={['content_creator', 'admin']}>
+                <CreatorDashboard />
+              </ProtectedRoute>
+            } />
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedRedirect />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </DashboardProvider>
       </AuthProvider>
     </BrowserRouter>
   );

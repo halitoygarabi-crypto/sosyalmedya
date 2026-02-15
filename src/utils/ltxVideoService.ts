@@ -40,6 +40,17 @@ class LTXVideoService {
     }
 
     getApiKey(): string {
+        // Centralized AI Settings (from DashboardContext)
+        try {
+            const savedSettings = localStorage.getItem('ai_settings');
+            if (savedSettings) {
+                const settings = JSON.parse(savedSettings);
+                if (settings.falKey) return settings.falKey.trim();
+            }
+        } catch {
+            console.error('Failed to parse ai_settings in ltxVideoService');
+        }
+
         // Priority: LocalStorage (manual entry) > Environment Variable
         const localKey = localStorage.getItem('ltx_api_key');
         if (localKey && localKey.trim()) {

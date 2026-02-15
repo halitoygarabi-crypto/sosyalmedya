@@ -14,6 +14,8 @@ export interface InfluencerGenerationRequest {
 export interface InfluencerGenerationResponse {
     success: boolean;
     imageUrl?: string;
+    videoUrl?: string; // Support for video generated from influencer
+    type?: 'image' | 'video'; // Distinguish between content types
     error?: string;
     requestId?: string;
     seed?: number;
@@ -23,6 +25,17 @@ class AIInfluencerService {
     private baseUrl: string = 'https://fal.run';
 
     getApiKey(): string {
+        // Centralized AI Settings (from DashboardContext)
+        try {
+            const savedSettings = localStorage.getItem('ai_settings');
+            if (savedSettings) {
+                const settings = JSON.parse(savedSettings);
+                if (settings.falKey) return settings.falKey.trim();
+            }
+        } catch {
+            // Silently fail and fallback
+        }
+
         // Priority: LocalStorage (manual entry) > Environment Variable
         const localKey = localStorage.getItem('ltx_api_key');
         if (localKey && localKey.trim()) {

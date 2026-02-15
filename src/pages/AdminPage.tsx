@@ -198,7 +198,7 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({ customer, isO
                     {tabs.map(tab => (
                         <button
                             key={tab.id}
-                            onClick={() => setActiveTab(tab.id as any)}
+                            onClick={() => setActiveTab(tab.id as typeof activeTab)}
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
@@ -665,11 +665,12 @@ const AdminPage: React.FC = () => {
 
             console.log('Fetched profiles count:', profiles?.length || 0);
             setCustomers(profiles || []);
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error in fetchCustomers:', error);
+            const message = error instanceof Error ? error.message : 'Bilinmeyen hata';
             addNotification({
                 type: 'error',
-                message: 'Müşteriler yüklenemedi: ' + (error.message || 'Bilinmeyen hata'),
+                message: 'Müşteriler yüklenemedi: ' + message,
                 read: false
             });
         } finally {
@@ -738,11 +739,12 @@ const AdminPage: React.FC = () => {
             setShowAddModal(false);
 
             fetchCustomers();
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Add customer error:', error);
+            const message = error instanceof Error ? error.message : 'Müşteri oluşturulamadı.';
             addNotification({
                 type: 'error',
-                message: 'Hata: ' + (error.message || 'Müşteri oluşturulamadı.'),
+                message: 'Hata: ' + message,
                 read: false
             });
         } finally {
@@ -794,10 +796,11 @@ const AdminPage: React.FC = () => {
             });
 
             fetchCustomers();
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Bilinmeyen hata';
             addNotification({
                 type: 'error',
-                message: 'Güncelleme hatası: ' + error.message,
+                message: 'Güncelleme hatası: ' + message,
                 read: false
             });
             throw error;
@@ -824,8 +827,9 @@ const AdminPage: React.FC = () => {
                 read: false
             });
             fetchCustomers();
-        } catch (error: any) {
-            addNotification({ type: 'error', message: 'Hata: ' + error.message, read: false });
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Bilinmeyen hata';
+            addNotification({ type: 'error', message: 'Hata: ' + message, read: false });
         }
     };
 

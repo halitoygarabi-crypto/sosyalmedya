@@ -32,11 +32,11 @@ interface NavItem {
 
 const mainNavItems: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-    { id: 'analytics', label: 'Analytics', icon: <BarChart3 size={18} /> },
+    { id: 'content', label: 'İçerikler', icon: <FileText size={18} />, badge: 3 },
     { id: 'video-generator', label: 'Video Üretici', icon: <Video size={18} /> },
     { id: 'ai-influencer', label: 'AI Influencer', icon: <Users size={18} /> },
     { id: 'schedule', label: 'Zamanlama', icon: <Calendar size={18} /> },
-    { id: 'content', label: 'İçerikler', icon: <FileText size={18} />, badge: 3 },
+    { id: 'analytics', label: 'Analytics', icon: <BarChart3 size={18} /> },
     { id: 'audience', label: 'Kitle', icon: <Users size={18} /> },
     { id: 'performance', label: 'Performans', icon: <TrendingUp size={18} /> },
     { id: 'automation', label: 'Otomasyon', icon: <Zap size={18} /> },

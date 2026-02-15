@@ -1,121 +1,124 @@
 import type { Post, PlatformStats } from '../types';
+import { llmService } from './llmService';
+import { replicateService } from './replicateService';
+import { aiInfluencerService } from './aiInfluencerService';
+import { googleSheetsService } from './googleSheetsService';
+import { limeSocialService } from './limeSocialService';
+import type { LimeSocialSettings } from './limeSocialService';
 
-const API_URL = import.meta.env.VITE_N99_API_URL || import.meta.env.VITE_N8N_API_URL;
-const API_KEY = import.meta.env.VITE_N99_API_KEY || import.meta.env.VITE_N8N_API_KEY;
-const WEBHOOK_URL = import.meta.env.VITE_N99_WEBHOOK_URL || import.meta.env.VITE_N8N_WEBHOOK_URL;
-
-const headers = {
-    'X-N99-API-KEY': API_KEY,
-    'Content-Type': 'application/json',
-};
+/**
+ * Refactored n99Service (No n8n version)
+ * This service now handles all logic locally within the app
+ * by coordinating between direct API services.
+ */
 
 export const n99Service = {
-    // Fetch all posts from n99-managed database
+    // Mock fetch posts (could use supabaseService here)
     fetchPosts: async (): Promise<Post[]> => {
-        try {
-            const response = await fetch(`${API_URL}/posts`, { headers });
-            if (!response.ok) throw new Error('Postlar getirilemedi');
-            return await response.json();
-        } catch (error) {
-            console.error('n99 API Error (fetchPosts):', error);
-            return []; // Hata durumunda boş döner veya mock dataya fallback yapabiliriz
-        }
+        return [];
     },
 
-    // Send a new post to n99 workflow
-    createPost: async (postData: Partial<Post>, limeSocialSettings?: Record<string, string>): Promise<boolean> => {
-        try {
-            const response = await fetch(WEBHOOK_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'create_post',
-                    data: postData,
-                    limesocial: limeSocialSettings
-                }),
-            });
-            return response.ok;
-        } catch (error) {
-            console.error('n99 Webhook Error (createPost):', error);
-            return false;
-        }
+    // Handle post creation locally
+    createPost: async (postData: Partial<Post>): Promise<boolean> => {
+        console.log('📝 Post oluşturuluyor (Local):', postData);
+        // If we want to persist, we could call supabaseService.addPost(postData)
+        return true;
     },
 
-    // Fetch performance metrics
+    // Fetch stats
     fetchStats: async (): Promise<PlatformStats[]> => {
-        try {
-            const response = await fetch(`${API_URL}/stats`, { headers });
-            if (!response.ok) throw new Error('İstatistikler getirilemedi');
-            return await response.json();
-        } catch (error) {
-            console.error('n99 API Error (fetchStats):', error);
-            return [];
-        }
+        return [];
     },
 
-    // Update a scheduled post
+    // Update post
     updatePost: async (id: string, updates: Partial<Post>): Promise<boolean> => {
-        try {
-            const response = await fetch(`${WEBHOOK_URL}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'update_post',
-                    postId: id,
-                    updates,
-                }),
-            });
-            return response.ok;
-        } catch (error) {
-            console.error('n99 Webhook Error (updatePost):', error);
-            return false;
-        }
+        console.log('📝 Post güncelleniyor (Local):', id, updates);
+        return true;
     },
 
-    // Generate AI content (caption + video) with customer-specific prompt
-    generateContent: async (content: string, customerId: string, limeSocialSettings?: Record<string, string>): Promise<{ caption: string; videoUrl: string } | null> => {
+    /**
+     * Generate AI content (caption + visual)
+     * DIRECT APP IMPLEMENTATION (NO n8n)
+     */
+    generateContent: async (
+        prompt: string, 
+        customerId: string, 
+        postType: 'post' | 'reel' | 'story' = 'post',
+        platforms: string[] = []
+    ): Promise<{ caption: string; videoUrl: string } | null> => {
         try {
-            const response = await fetch(WEBHOOK_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'generate_content',
-                    content,
-                    customerId,
-                    limesocial: limeSocialSettings
-                }),
-            });
+            console.log('🚀 AI İçerik üretimi başlatılıyor (Direct Uygulama)...');
 
-            if (!response.ok) {
-                throw new Error('AI içerik üretimi başarısız');
+            // 1. Generate Caption using LLM
+            const caption = await llmService.generateCaption(prompt, `Müşteri: ${customerId}`, platforms[0] || 'instagram');
+
+            // 2. Generate Visual using Replicate or Fal.ai
+            let visualUrl = '';
+            
+            console.log('🖼️ Görsel üretimi deneniyor (Replicate)...');
+            visualUrl = await replicateService.generateImage(prompt) || '';
+            console.log('🖼️ Replicate Sonucu:', visualUrl ? 'Başarılı' : 'Başarısız');
+            
+            // Fallback to fal.ai if replicate fails
+            if (!visualUrl) {
+                console.log('⚠️ Replicate başarısız veya anahtar yok, Fal.ai deneniyor...');
+                const falResponse = await aiInfluencerService.generateInfluencer({
+                    prompt: prompt,
+                    model: 'flux-schnell'
+                });
+                visualUrl = falResponse.imageUrl || '';
+                console.log('🖼️ Fal.ai Sonucu:', visualUrl ? 'Başarılı' : 'Başarısız');
+                if (!visualUrl) {
+                    console.warn('❌ Tüm görsel üretim servisleri başarısız oldu.');
+                }
             }
 
-            const result = await response.json();
+            console.log('📊 Google Sheets kaydı için hazırlanan veriler:', {
+                prompt,
+                customerId,
+                caption: caption ? (caption.slice(0, 50) + '...') : 'MİSSİNG',
+                visualUrl
+            });
+
+            // 3. Log to Google Sheets (Non-blocking)
+            if (caption && googleSheetsService.isConfigured()) {
+                googleSheetsService.saveToNamedSheet('n99', {
+                    date: new Date().toISOString(),
+                    prompt: prompt,
+                    imageUrl: visualUrl,
+                    type: postType === 'post' ? 'image' : 'video',
+                    clientName: customerId,
+                    metadata: {
+                        caption: caption,
+                        postType: postType,
+                        platforms: platforms.join(', '),
+                        method: 'Direct App (No n8n)'
+                    }
+                }).then(res => console.log('✅ Google Sheets Log Sonucu:', res))
+                  .catch(err => console.error('❌ Google Sheets Log Hatası:', err));
+            }
+
+            if (!caption) {
+                throw new Error('Metin içeriği üretilemedi (OpenAI Error)');
+            }
+
             return {
-                caption: result.caption || '',
-                videoUrl: result.videoUrl || '',
+                caption: caption,
+                videoUrl: visualUrl,
             };
         } catch (error) {
-            console.error('n99 Webhook Error (generateContent):', error);
-            return null;
+            console.error('Direct App Content Generation Error:', error);
+            throw error; // UI bileşeninin hatayı yakalaması için
         }
     },
 
-    // Manually publish a verified post to LimeSocial
-    publishToLimeSocial: async (post: Post, limeSocialSettings: Record<string, string>): Promise<boolean> => {
+    // Direct publishing to LimeSocial
+    publishToLimeSocial: async (post: Post, limeSocialSettings: LimeSocialSettings): Promise<boolean> => {
         try {
-            const response = await fetch(WEBHOOK_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'publish_to_limesocial',
-                    post: post,
-                    limesocial: limeSocialSettings
-                }),
-            });
-            return response.ok;
+            const result = await limeSocialService.publishPost(post, limeSocialSettings);
+            return result.success;
         } catch (error) {
-            console.error('n99 Webhook Error (publishToLimeSocial):', error);
+            console.error('Publish Error:', error);
             return false;
         }
     }

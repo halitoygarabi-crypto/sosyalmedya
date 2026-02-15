@@ -64,8 +64,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
             console.log('Profile data received, is_admin:', data?.is_admin);
             return data as CustomerProfile;
-        } catch (err: any) {
-            if (err.name === 'AbortError') return null;
+        } catch (err: unknown) {
+            if (err instanceof Error && err.name === 'AbortError') return null;
             console.error('Unexpected profile error:', err);
             return null;
         }
@@ -74,7 +74,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Initialize auth state
     useEffect(() => {
         let isMounted = true;
-        let authSubscription: any = null;
+        let authSubscription: { unsubscribe: () => void } | null = null;
 
         const initialize = async () => {
             console.log('Auth initialization started');
@@ -149,7 +149,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
 
             return { error: null };
-        } catch (err) {
+        } catch {
             return { error: 'Giriş işlemi başarısız oldu.' };
         } finally {
             setIsLoading(false);
@@ -189,9 +189,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
             console.log('Registration and profile creation successful');
             return { error: null };
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('Unexpected registration error:', err);
-            return { error: 'Beklenmeyen bir hata oluştu: ' + (err.message || 'Bilinmeyen hata') };
+            const message = err instanceof Error ? err.message : 'Bilinmeyen hata';
+            return { error: 'Beklenmeyen bir hata oluştu: ' + message };
         }
     }, []);
 
@@ -216,7 +217,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const newProfile = await fetchCustomerProfile(user.id);
             setCustomerProfile(newProfile);
             return true;
-        } catch (err) {
+        } catch {
             return false;
         }
     }, [user, fetchCustomerProfile]);

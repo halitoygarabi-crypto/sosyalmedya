@@ -1,0 +1,127 @@
+{
+  "name": "influserek",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ai-influencer-ad",
+        "options": {}
+      },
+      "id": "6d9e8b7a-c1a2-4b3d-8e5f-9g0h1i2j3k4l",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ],
+      "webhookId": "influserek-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $node[\"Webhook\"].json.body;\n\n// Dashboard'dan gelen verileri eşle\nconst influencerName = body['Influencer Adı'] || 'Luna AI';\nconst brandName = body['Marka Adı'] || 'Markanız';\nconst productName = body['Ürün Adı'] || 'Ürününüz';\nconst tone = body['Ses Tonu'] || 'Samimi';\nconst target = body['Hedef Kitle'] || 'Herkes';\nconst cta = body['CTA'] || 'Hemen Dene!';\nconst userScript = body['Konuşma Metni'];\nconst mainImage = body['Seçili Influencer Görsel URL'];\nconst productImage = body['Ürün Görseli'];\nconst locationImage = body['Mekan Görseli'];\n\n// Senaryo mantığı: Kullanıcı yazdıysa onu kullan, yoksa otomatik üret\nconst theme = `${brandName} ile modern bir yaşam`;\nconst hook = `${productName} hayatınızı nasıl değiştirecek?`;\nconst script = userScript || `Merhaba arkadaşlar! Bugün size harika bir haberim var. ${brandName} yeni ${productName} ile gerçekten çıtayı yükseltmiş. ${tone} bir yaklaşımla tasarlanan bu ürün, tam da ${target} için. ${cta}`;\n\n// A/B Test kancaları\nconst hooks = [\n  `${productName} ile tanışmaya hazır mısınız?`,\n  `Neden herkes ${brandName} konuşuyor?`,\n  `Hayatınızı kolaylaştıracak o tek şey: ${productName}`\n];\n\nreturn {\n  success: true,\n  date: new Date().toISOString(),\n  influencer: influencerName,\n  brand: brandName,\n  product: productName,\n  ad_concept: {\n    theme: theme,\n    hook: hook,\n    usp: body['Ürün Açıklaması'] || 'Eşsiz kalite ve tasarım'\n  },\n  talking_head_ad: {\n    script: {\n      full_script: script,\n      sections: [\n        { time: \"00:00\", text: \"Giriş: \" + hook, emotion: \"Mutlu\" },\n        { time: \"00:05\", text: \"Gelişme: Ürün detayları\", emotion: \"Heyecanlı\" },\n        { time: \"00:10\", text: \"Sonuç: \" + cta, emotion: \"Samimi\" }\n      ]\n    },\n    video_url: null,\n    video_status: \"pending\",\n    source_image: mainImage\n  },\n  product_ad: {\n     info: {\n       scene: `${productName} profesyonel ışık altında dönüyor`,\n       overlay_texts: [productName, brandName, \"Hemen Al\"],\n       music_mood: \"energetic\"\n     },\n     video_url: null,\n     video_status: \"pending\",\n     source_image: productImage || mainImage\n  },\n  lifestyle_ad: {\n     source_image: locationImage || mainImage\n  },\n  all_images: {\n    influencer_main: mainImage,\n    influencer_closeup: mainImage,\n    product_hero: productImage || mainImage,\n    lifestyle: locationImage || mainImage\n  },\n  all_videos: {\n    talking_head: null,\n    product: null,\n    lifestyle: null\n  },\n  instagram: {\n    caption: `${brandName} ${productName} ile tanışın! 🚀\\n\\n${script}\\n\\n#${brandName.replace(/\\s/g, '')} #AIInfluencer #Marketing`,\n    hashtags: \"#ads #marketing #ai\",\n    cover_text: productName,\n    posting_time: \"18:00\"\n  },\n  ab_test_hooks: hooks\n};"
+      },
+      "id": "8f1a2b3c-e3d4-6f5g-0h1i-j2k3l4m5n6o7",
+      "name": "Generate Ad Logic",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        550,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://script.google.com/macros/s/AKfycbzilHKyqA2t_rxEb23tpU2bih4FhPNraotikVSGgxy7SzmNrrh5vQ550Brihz35cybL/exec",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "date",
+              "value": "={{ $json.date }}"
+            },
+            {
+              "name": "influencer",
+              "value": "={{ $json.influencer }}"
+            },
+            {
+              "name": "brand",
+              "value": "={{ $json.brand }}"
+            },
+            {
+              "name": "product",
+              "value": "={{ $json.product }}"
+            },
+            {
+              "name": "script",
+              "value": "={{ $json.talking_head_ad.script.full_script }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1a2b3c4d-5e6f-7g8h-9i0j-k1l2m3n4o5p6",
+      "name": "Log to Google Sheets",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        800,
+        300
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "9g2h3i4j-f4k5-7l6m-1n2o-p3q4r5s6t7u8",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Generate Ad Logic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Ad Logic": {
+      "main": [
+        [
+          {
+            "node": "Log to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log to Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -32,6 +32,16 @@ interface DashboardContextType {
         apiKey: string;
         accounts: string;
     };
+    aiSettings: {
+        replicateKey: string;
+        falKey: string;
+    };
+    googleSheetsSettings: {
+        webhookUrl: string;
+    };
+    n99Settings: {
+        webhookUrl: string;
+    };
 
     // Actions
     setPosts: (posts: Post[]) => void;
@@ -49,6 +59,9 @@ interface DashboardContextType {
     clearNotifications: () => void;
     setActiveClientId: (id: string) => void;
     updateLimeSocialSettings: (settings: Partial<DashboardContextType['limeSocialSettings']>) => void;
+    updateAiSettings: (settings: Partial<DashboardContextType['aiSettings']>) => void;
+    updateGoogleSheetsSettings: (settings: Partial<DashboardContextType['googleSheetsSettings']>) => void;
+    updateN99Settings: (settings: Partial<DashboardContextType['n99Settings']>) => void;
     publishPost: (post: Post) => Promise<void>;
 }
 
@@ -85,6 +98,47 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
             return {
                 apiKey: import.meta.env.VITE_LIMESOCIAL_API_KEY || '',
                 accounts: ''
+            };
+        }
+    });
+    const [aiSettings, setAiSettings] = useState(() => {
+        try {
+            const saved = localStorage.getItem('ai_settings');
+            return saved ? JSON.parse(saved) : {
+                replicateKey: import.meta.env.VITE_REPLICATE_API_KEY || '',
+                falKey: import.meta.env.VITE_FAL_KEY || import.meta.env.VITE_FAL_AI_API_KEY || import.meta.env.VITE_FAL_API_KEY || ''
+            };
+        } catch (e) {
+            console.error('Failed to parse ai_settings:', e);
+            return {
+                replicateKey: import.meta.env.VITE_REPLICATE_API_KEY || '',
+                falKey: import.meta.env.VITE_FAL_KEY || import.meta.env.VITE_FAL_AI_API_KEY || import.meta.env.VITE_FAL_API_KEY || ''
+            };
+        }
+    });
+
+    const [googleSheetsSettings, setGoogleSheetsSettings] = useState(() => {
+        try {
+            const saved = localStorage.getItem('google_sheets_webhook_url');
+            return {
+                webhookUrl: saved || import.meta.env.VITE_GOOGLE_SHEETS_WEBHOOK_URL || ''
+            };
+        } catch {
+            return {
+                webhookUrl: import.meta.env.VITE_GOOGLE_SHEETS_WEBHOOK_URL || ''
+            };
+        }
+    });
+
+    const [n99Settings, setN99Settings] = useState(() => {
+        try {
+            const saved = localStorage.getItem('n99_webhook_url');
+            return {
+                webhookUrl: saved || import.meta.env.VITE_N99_WEBHOOK_URL || ''
+            };
+        } catch {
+            return {
+                webhookUrl: import.meta.env.VITE_N99_WEBHOOK_URL || ''
             };
         }
     });
@@ -212,24 +266,25 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
 
     const addPost = useCallback(async (post: Post) => {
         setIsLoading(true);
-        const n99Success = await n99Service.createPost(post, limeSocialSettings);
+        const n99Success = await n99Service.createPost(post);
         const supabaseSuccess = await supabaseService.createPost(post);
 
+        // Always add to local state
+        setPosts((prev) => [post, ...prev]);
+
         if (supabaseSuccess || n99Success) {
-            setPosts((prev) => [post, ...prev]);
-            addNotification({
-                type: 'success',
-                message: post.status === 'draft'
-                    ? `Taslak oluşturuldu: ${post.title}`
-                    : `Post planlandı: ${post.title}`,
-                read: false
-            });
+            const statusMsg = post.status === 'posted'
+                ? `İçerik oluşturuldu: ${post.title}`
+                : post.status === 'scheduled'
+                ? `Post planlandı: ${post.title}`
+                : `Taslak oluşturuldu: ${post.title}`;
+            addNotification({ type: 'success', message: statusMsg, read: false });
         } else {
-            setPosts((prev) => [post, ...prev]);
-            addNotification({ type: 'warning', message: 'Post yerel kaydedildi ama senkronize edilemedi.', read: false });
+            console.warn('⚠️ Supabase ve n99 kaydetme başarısız. Sadece yerel state\'e eklendi.');
+            addNotification({ type: 'warning', message: 'Post yerel kaydedildi ama veritabanına senkronize edilemedi.', read: false });
         }
         setIsLoading(false);
-    }, [limeSocialSettings, addNotification]);
+    }, [addNotification]);
 
     const updatePost = useCallback(async (id: string, updates: Partial<Post>) => {
         setPosts((prev) =>
@@ -306,6 +361,39 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
         setIsLoading(false);
     }, [limeSocialSettings, updatePost, addNotification]);
 
+    const updateAiSettings = useCallback((newSettings: Partial<DashboardContextType['aiSettings']>) => {
+        setAiSettings((prev: DashboardContextType['aiSettings']) => {
+            const updated = { ...prev, ...newSettings };
+            localStorage.setItem('ai_settings', JSON.stringify(updated));
+            return updated;
+        });
+        addNotification({ type: 'success', message: 'AI ayarları güncellendi.', read: false });
+    }, [addNotification]);
+
+    const updateGoogleSheetsSettings = useCallback((newSettings: Partial<DashboardContextType['googleSheetsSettings']>) => {
+        setGoogleSheetsSettings((prev: DashboardContextType['googleSheetsSettings']) => {
+            const updated = { ...prev, ...newSettings };
+            if (updated.webhookUrl) {
+                localStorage.setItem('google_sheets_webhook_url', updated.webhookUrl);
+                // Also update the singleton service
+                import('../utils/googleSheetsService').then(m => m.googleSheetsService.setWebhookUrl(updated.webhookUrl));
+            }
+            return updated;
+        });
+        addNotification({ type: 'success', message: 'Google Sheets ayarları güncellendi.', read: false });
+    }, [addNotification]);
+
+    const updateN99Settings = useCallback((newSettings: Partial<DashboardContextType['n99Settings']>) => {
+        setN99Settings((prev: DashboardContextType['n99Settings']) => {
+            const updated = { ...prev, ...newSettings };
+            if (updated.webhookUrl) {
+                localStorage.setItem('n99_webhook_url', updated.webhookUrl);
+            }
+            return updated;
+        });
+        addNotification({ type: 'success', message: 'n99 Orchestration ayarları güncellendi.', read: false });
+    }, [addNotification]);
+
     const value: DashboardContextType = {
         posts,
         notifications,
@@ -336,6 +424,12 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
         setActiveClientId,
         limeSocialSettings,
         updateLimeSocialSettings,
+        aiSettings,
+        updateAiSettings,
+        googleSheetsSettings,
+        updateGoogleSheetsSettings,
+        n99Settings,
+        updateN99Settings,
         publishPost,
     };
 

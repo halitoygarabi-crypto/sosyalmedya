@@ -19,6 +19,17 @@ export interface TalkingInfluencerResponse {
 
 class AITalkingService {
     getApiKey(): string {
+        // Centralized AI Settings (from DashboardContext)
+        try {
+            const savedSettings = localStorage.getItem('ai_settings');
+            if (savedSettings) {
+                const settings = JSON.parse(savedSettings);
+                if (settings.falKey) return settings.falKey.trim();
+            }
+        } catch {
+            // Silently fail and fallback
+        }
+
         const localKey = localStorage.getItem('ltx_api_key');
         if (localKey && localKey.trim()) {
             return localKey.trim();
@@ -31,50 +42,148 @@ class AITalkingService {
         return '';
     }
 
+    getMirakoKey(): string {
+        try {
+            const savedSettings = localStorage.getItem('ai_settings');
+            if (savedSettings) {
+                const settings = JSON.parse(savedSettings);
+                if (settings.mirakoKey) return settings.mirakoKey.trim();
+            }
+        } catch {
+            // Settings not found or parse error, proceed to fallback
+        }
+
+        const envKey = import.meta.env.VITE_MIRAKO_API_KEY;
+        if (envKey && envKey !== 'your_mirako_key') return envKey.trim();
+        
+        // Provided by user: mi_FWR0uI66nLD5yiSt-KjlJvP7PyADve-ewc-i4qXfYJg
+        return 'mi_FWR0uI66nLD5yiSt-KjlJvP7PyADve-ewc-i4qXfYJg';
+    }
+
     /**
-     * Generate a talking video using fal.ai
-     * 1. Generate audio from text using f5-tts
-     * 2. Generate video using SadTalker with the generated audio
+     * Generate a talking video.
+     * Priority: Mirako AI (if key exists) -> fal.ai (SadTalker)
+     * HeyGen disabled per user request.
      */
     async generateTalkingVideo(request: TalkingInfluencerRequest): Promise<TalkingInfluencerResponse> {
+        const mirakoKey = this.getMirakoKey();
+        
+        if (mirakoKey) {
+            return this.generateWithMirako(request, mirakoKey);
+        }
+
+        return this.generateWithFal(request);
+    }
+
+    private async generateWithMirako(request: TalkingInfluencerRequest, apiKey: string): Promise<TalkingInfluencerResponse> {
+        try {
+            console.log('🗣️ Mirako AI kullanılarak konuşturuluyor...');
+            
+            // Mirako usually accepts image and text
+            const response = await fetch('https://mirako.co/v1/video/async_generate_talking_avatar', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    image: request.imageUrl,
+                    audio: request.script,
+                    voice_id: request.voiceId || "female_01",
+                    negative_prompt: "nsfw, low quality, blurry"
+                }),
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                const status = response.status;
+                console.error(`❌ Mirako AI Error (${status}):`, errorText);
+                throw new Error(`Mirako Hatası: ${status} - ${errorText}`);
+            }
+
+            const data = await response.json();
+            const taskId = data.task_id || data.id;
+
+            if (!taskId) throw new Error('Mirako task ID alınamadı.');
+
+            console.log('⏳ Mirako videosu üretiliyor, Task ID:', taskId);
+
+            // Poll for Mirako result
+            let attempts = 0;
+            const maxAttempts = 60;
+            while (attempts < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                
+                const statusRes = await fetch(`https://mirako.co/v1/video/task/${taskId}`, {
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${apiKey}` }
+                });
+
+                if (statusRes.ok) {
+                    const statusData = await statusRes.json();
+                    const status = statusData.status?.toLowerCase();
+
+                    if (status === 'completed' || status === 'succeeded') {
+                        const videoUrl = statusData.video_url || 
+                                       statusData.result?.video_url ||
+                                       (statusData.results && statusData.results[0]?.url) ||
+                                       (statusData.results && statusData.results[0]?.video_url);
+
+                        if (videoUrl) {
+                            console.log('✅ Mirako Talking Video Ready:', videoUrl);
+                        }
+
+                        return {
+                            success: !!videoUrl,
+                            videoUrl: videoUrl,
+                            error: videoUrl ? undefined : 'Video tamamlandı ancak adresi alınamadı.',
+                            requestId: taskId
+                        };
+                    } else if (status === 'failed' || status === 'error') {
+                        throw new Error(`Mirako üretimi başarısız: ${statusData.error_message || 'Bilinmeyen hata'}`);
+                    }
+                }
+                attempts++;
+            }
+            throw new Error('Mirako zaman aşımı.');
+        } catch (error) {
+            console.warn('Mirako hatası, fal.ai denenecek:', error);
+            return this.generateWithFal(request);
+        }
+    }
+
+    private async generateWithFal(request: TalkingInfluencerRequest): Promise<TalkingInfluencerResponse> {
         const apiKey = this.getApiKey();
         if (!apiKey) {
-            return { success: false, error: 'API anahtarı bulunamadı. Ayarlardan fal.ai API anahtarınızı girin.' };
+            return { success: false, error: 'API anahtarı bulunamadı.' };
         }
 
         try {
-            console.log('🗣️ AI Influencer konuşturuluyor (2 aşamalı işlem)...');
-            console.log('📝 Script:', request.script.substring(0, 50) + '...');
-
-            // AŞAMA 1: Metinden Ses Üretimi (TTS)
-            console.log('🔊 Ses üretiliyor (fal-ai/f5-tts)...');
-            const ttsResponse = await fetch('https://fal.run/fal-ai/f5-tts', {
+            console.log('🗣️ fal.ai (SadTalker) kullanılarak konuşturuluyor...');
+            
+            // AŞAMA 1: Kling TTS (Bypass cache with timestamp)
+            const ttsUrl = `https://fal.run/fal-ai/kling-video/v1/tts?v=${Date.now()}`;
+            const ttsResponse = await fetch(ttsUrl, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Key ${apiKey}`,
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    gen_text: request.script,
+                body: JSON.stringify({ 
+                    text: request.script,
+                    voice_id: "genshin_vindi2"
                 }),
             });
 
             if (!ttsResponse.ok) {
-                const errorData = await ttsResponse.json().catch(() => ({}));
-                throw new Error(`TTS Hatası: ${errorData.detail || ttsResponse.status}`);
+                const errText = await ttsResponse.text();
+                console.error('❌ fal.ai TTS Error:', errText);
+                throw new Error(`TTS Hatası: ${ttsResponse.status}`);
             }
-
             const ttsData = await ttsResponse.json();
-            const audioUrl = ttsData.media?.url || ttsData.url;
+            const audioUrl = ttsData.audio?.url || ttsData.url;
 
-            if (!audioUrl) {
-                throw new Error('Ses dosyası üretilemedi.');
-            }
-
-            console.log('✅ Ses üretildi:', audioUrl);
-
-            // AŞAMA 2: Video Üretimi (SadTalker)
-            console.log('🎬 Dudak senkronizasyonu yapılıyor (fal-ai/sadtalker)...');
+            // AŞAMA 2: SadTalker
             const submitResponse = await fetch('https://queue.fal.run/fal-ai/sadtalker', {
                 method: 'POST',
                 headers: {
@@ -85,89 +194,37 @@ class AITalkingService {
                     source_image_url: request.imageUrl,
                     driven_audio_url: audioUrl,
                     face_model_resolution: '512',
-                    expression_scale: 1.0,
-                    preprocess: 'crop',
-                    still: true, // Movement is more stable
+                    still: true,
                 }),
             });
 
-            if (!submitResponse.ok) {
-                const errorData = await submitResponse.json().catch(() => ({}));
-                throw new Error(`Video Hatası: ${errorData.detail || submitResponse.status}`);
-            }
-
+            if (!submitResponse.ok) throw new Error('SadTalker Hatası');
             const submitData = await submitResponse.json();
             const requestId = submitData.request_id;
 
-            if (!requestId) {
-                return {
-                    success: true,
-                    videoUrl: submitData.video?.url || submitData.url,
-                    requestId: 'sync'
-                };
-            }
-
-            console.log('⏳ İşlem kuyruğa alındı, Request ID:', requestId);
-
-            // Poll for result
+            // Polling (simplified for length)
             let attempts = 0;
-            const maxAttempts = 120; // Video can take longer
-            
-            while (attempts < maxAttempts) {
-                await new Promise(resolve => setTimeout(resolve, 3000)); // Poll every 3 seconds
-                
-                try {
-                    const statusResponse = await fetch(`https://queue.fal.run/fal-ai/sadtalker/requests/${requestId}/status`, {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': `Key ${apiKey}`,
-                        },
-                    });
-
-                    if (statusResponse.ok) {
-                        const statusData = await statusResponse.json();
-                        
-                        if (statusData.status === 'COMPLETED') {
-                            const resultResponse = await fetch(`https://queue.fal.run/fal-ai/sadtalker/requests/${requestId}`, {
-                                method: 'GET',
-                                headers: {
-                                    'Authorization': `Key ${apiKey}`,
-                                },
-                            });
-
-                            if (resultResponse.ok) {
-                                const resultData = await resultResponse.json();
-                                return {
-                                    success: true,
-                                    videoUrl: resultData.video?.url || resultData.url,
-                                    requestId: requestId
-                                };
-                            }
-                        } else if (statusData.status === 'FAILED') {
-                            throw new Error(statusData.error || 'Video üretimi başarısız oldu');
-                        }
+            while (attempts < 30) {
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                const res = await fetch(`https://queue.fal.run/fal-ai/sadtalker/requests/${requestId}`, {
+                    headers: { 'Authorization': `Key ${apiKey}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.status === 'COMPLETED') {
+                        return { success: true, videoUrl: data.video?.url || data.url, requestId };
                     }
-                } catch (pollError) {
-                    console.warn('Poll status error (retrying):', pollError);
                 }
-                
                 attempts++;
             }
-
-            throw new Error('Video üretimi zaman aşımına uğradı.');
-
-        } catch (error: unknown) {
-            console.error('❌ Influencer konuşturma hatası:', error);
-            const errorMessage = error instanceof Error ? error.message : 'Video üretilemedi';
-            return {
-                success: false,
-                error: errorMessage,
-            };
+            throw new Error('fal.ai zaman aşımı.');
+        } catch (error) {
+            return { success: false, error: error instanceof Error ? error.message : 'Üretim hatası' };
         }
     }
 
     isConfigured(): boolean {
-        return !!this.getApiKey();
+        return !!this.getApiKey() || !!this.getMirakoKey();
     }
 }
 

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
     Video,
     Wand2,
@@ -17,9 +17,13 @@ import {
     RefreshCw,
     Upload,
     Film,
+    Table,
 } from 'lucide-react';
 import { ltxVideoService } from '../utils/ltxVideoService';
-import { higgsfieldService } from '../utils/higgsfieldService';
+import { mirakoService } from '../utils/mirakoService';
+import { googleSheetsService } from '../utils/googleSheetsService';
+import { llmService } from '../utils/llmService';
+import type { SheetEntry } from '../utils/googleSheetsService';
 import type { VideoGenerationRequest, VideoGenerationResponse } from '../utils/ltxVideoService';
 import { useDashboard } from '../context/DashboardContext';
 
@@ -37,7 +41,7 @@ interface VideoGeneratorProps {
 }
 
 type GenerationMode = 'text-to-video' | 'image-to-video';
-type VideoProvider = 'kling' | 'higgsfield';
+type VideoProvider = 'kling' | 'mirako';
 
 const VideoGenerator: React.FC<VideoGeneratorProps> = ({ selectedClient }) => {
     const { addNotification } = useDashboard();
@@ -52,6 +56,8 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ selectedClient }) => {
     const [quality, setQuality] = useState<'fast' | 'quality'>('fast');
 
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isSavingToSheet, setIsSavingToSheet] = useState(false);
+    const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
     const [result, setResult] = useState<VideoGenerationResponse | null>(null);
     const [generationHistory, setGenerationHistory] = useState<VideoGenerationResponse[]>([]);
 
@@ -59,6 +65,58 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ selectedClient }) => {
     const [showApiKeyModal, setShowApiKeyModal] = useState(false);
     const [apiKey, setApiKey] = useState(ltxVideoService.getApiKey());
     const [isUploading, setIsUploading] = useState(false);
+
+    const handleGeneratePrompt = useCallback(async () => {
+        if (!prompt.trim()) {
+            addNotification({ type: 'warning', message: 'Lütfen önce basit bir ana fikir girin', read: false });
+            return;
+        }
+
+        setIsGeneratingPrompt(true);
+        addNotification({ type: 'info', message: '🪄 AI Prompt sihirbazı çalışıyor...', read: false });
+
+        try {
+            const context = selectedClient ? `${selectedClient.company_name} - ${selectedClient.industry}` : '';
+            const optimizedPrompt = await llmService.generateVideoPrompt(prompt, context);
+            setPrompt(optimizedPrompt);
+            addNotification({ type: 'success', message: '✨ Prompt başarıyla geliştirildi!', read: false });
+        } catch {
+            addNotification({ type: 'error', message: '❌ Prompt geliştirilemedi', read: false });
+        } finally {
+            setIsGeneratingPrompt(false);
+        }
+    }, [prompt, selectedClient, addNotification]);
+
+    const handleSaveToSheet = useCallback(async () => {
+        if (!result?.videoUrl) return;
+
+        setIsSavingToSheet(true);
+        const entry: SheetEntry = {
+            date: new Date().toLocaleString('tr-TR'),
+            prompt: prompt,
+            imageUrl: result.videoUrl, // Save video URL in the visual column
+            clientName: selectedClient?.company_name || 'Genel',
+            type: 'video',
+            metadata: {
+                provider,
+                duration,
+                aspectRatio,
+                mode: quality
+            }
+        };
+
+        const response = await googleSheetsService.saveToNamedSheet('içerik', entry);
+        setIsSavingToSheet(false);
+
+        if (response.success) {
+            addNotification({ type: 'success', message: '📊 Video başarıyla "İçerik N99" tablosuna kaydedildi!', read: false });
+        } else {
+            addNotification({ type: 'error', message: `❌ Kayıt hatası: ${response.error}`, read: false });
+            if (!googleSheetsService.isConfigured()) {
+                setShowApiKeyModal(true);
+            }
+        }
+    }, [result, prompt, selectedClient, provider, duration, aspectRatio, quality, addNotification]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -109,7 +167,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ selectedClient }) => {
 
         const isConfigured = provider === 'kling' 
             ? ltxVideoService.isConfigured() 
-            : higgsfieldService.isConfigured();
+            : mirakoService.isConfigured();
 
         if (!isConfigured) {
             setShowApiKeyModal(true);
@@ -153,12 +211,13 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ selectedClient }) => {
                 response = await ltxVideoService.generateFromImage(request);
             }
         } else {
-            // Higgsfield
-            response = await higgsfieldService.generateVideo({
-                prompt,
-                imageUrl: mode === 'image-to-video' ? imageUrl : undefined,
-                aspectRatio,
-                model: 'dop-preview'
+            // Mirako AI
+            response = await mirakoService.generateVideo({
+                prompt: request.prompt,
+                imageUrl: request.imageUrl,
+                aspectRatio: request.aspectRatio,
+                duration: request.duration,
+                negativePrompt: request.negativePrompt
             });
         }
 
@@ -177,7 +236,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ selectedClient }) => {
         if (provider === 'kling') {
             ltxVideoService.setApiKey(apiKey);
         } else {
-            higgsfieldService.setApiKey(apiKey);
+            mirakoService.setApiKey(apiKey);
         }
         setShowApiKeyModal(false);
         addNotification({ type: 'success', message: 'API anahtarı kaydedildi', read: false });
@@ -198,12 +257,12 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ selectedClient }) => {
                 <div>
                     <h2 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
                         <Video size={24} style={{ color: 'var(--accent-primary)' }} />
-                        {provider === 'kling' ? 'Kling AI Video Üretici' : 'Higgsfield AI Video Üretici'}
+                        {provider === 'kling' ? 'Kling AI Video Üretici' : 'Mirako AI Video Üretici'}
                     </h2>
                     <p className="text-muted text-sm">
                         {provider === 'kling' 
                             ? 'Fal.ai Kling modelleri ile sinematik AI videolar oluşturun' 
-                            : 'Higgsfield DoP modelleri ile yüksek estetikli AI videolar oluşturun'}
+                            : 'Mirako AI modelleri ile yüksek estetikli AI videolar oluşturun'}
                     </p>
                 </div>
                 <button
@@ -228,11 +287,11 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ selectedClient }) => {
                             <span>Kling AI</span>
                         </button>
                         <button
-                            className={`btn ${provider === 'higgsfield' ? 'btn-primary' : 'btn-ghost'}`}
-                            onClick={() => setProvider('higgsfield')}
+                            className={`btn ${provider === 'mirako' ? 'btn-primary' : 'btn-ghost'}`}
+                            onClick={() => setProvider('mirako')}
                             style={{ flex: 1 }}
                         >
-                            <span>Higgsfield</span>
+                            <span>Mirako AI</span>
                         </button>
                     </div>
 
@@ -256,10 +315,40 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ selectedClient }) => {
 
                     {/* Prompt Input */}
                     <div className="input-group" style={{ marginBottom: 'var(--spacing-lg)' }}>
-                        <label className="input-label">
-                            <Wand2 size={14} style={{ marginRight: '4px' }} />
-                            Video Açıklaması (Prompt)
-                        </label>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 'var(--spacing-xs)' }}>
+                            <label className="input-label" style={{ marginBottom: 0 }}>
+                                <Wand2 size={14} style={{ marginRight: '4px' }} />
+                                Video Açıklaması (Prompt)
+                            </label>
+                            <button
+                                className="btn btn-ghost btn-sm"
+                                onClick={handleGeneratePrompt}
+                                disabled={isGeneratingPrompt || !prompt.trim()}
+                                style={{ 
+                                    fontSize: '0.75rem', 
+                                    color: 'var(--accent-primary)',
+                                    background: 'var(--accent-soft)',
+                                    border: '1px solid var(--accent-soft-border)',
+                                    padding: '4px 10px',
+                                    borderRadius: 'var(--radius-full)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                }}
+                            >
+                                {isGeneratingPrompt ? (
+                                    <>
+                                        <Loader2 size={12} className="spin" />
+                                        <span>Geliştiriliyor...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Sparkles size={12} />
+                                        <span>AI ile Zenginleştir</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
                         <textarea
                             className="input"
                             rows={4}
@@ -534,6 +623,16 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ selectedClient }) => {
                                         <Download size={14} />
                                         <span>İndir</span>
                                     </a>
+                                    <button 
+                                        className="btn btn-secondary btn-sm" 
+                                        onClick={handleSaveToSheet}
+                                        disabled={isSavingToSheet}
+                                        style={{ color: '#107c10' }}
+                                        title="Google Sheet'e Kaydet"
+                                    >
+                                        {isSavingToSheet ? <Loader2 size={14} className="spin" /> : <Table size={14} />}
+                                        <span>Sheet</span>
+                                    </button>
                                     <button className="btn btn-secondary btn-sm" onClick={handleGenerate}>
                                         <RefreshCw size={14} />
                                         <span>Yeniden Oluştur</span>
@@ -585,22 +684,31 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ selectedClient }) => {
                                             gap: 'var(--spacing-sm)',
                                             padding: 'var(--spacing-sm)',
                                             background: 'var(--bg-tertiary)',
-                                            borderRadius: 'var(--radius-sm)'
+                                            borderRadius: 'var(--radius-sm)',
+                                            cursor: 'pointer',
+                                            border: result?.videoUrl === item.videoUrl ? '1px solid var(--accent-primary)' : '1px solid transparent'
                                         }}
+                                        onClick={() => setResult(item)}
                                     >
                                         <CheckCircle size={14} color="var(--success)" />
                                         <span style={{ fontSize: '0.75rem', flex: 1 }}>
                                             Video #{generationHistory.length - index}
                                         </span>
-                                        <a
-                                            href={item.videoUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="btn btn-ghost btn-icon"
-                                            style={{ padding: '4px' }}
-                                        >
-                                            <Play size={12} />
-                                        </a>
+                                        <div style={{ display: 'flex', gap: '4px' }}>
+                                            <a
+                                                href={item.videoUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="btn btn-ghost btn-icon"
+                                                style={{ padding: '4px' }}
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <Download size={12} />
+                                            </a>
+                                            <div className="btn btn-ghost btn-icon" style={{ padding: '4px' }}>
+                                                <Play size={12} />
+                                            </div>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -615,7 +723,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ selectedClient }) => {
                     <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px' }}>
                         <div className="modal-header">
                             <h2 className="modal-title">
-                                {provider === 'kling' ? 'fal.ai' : 'Higgsfield'} API Ayarları
+                                {provider === 'kling' ? 'fal.ai' : 'Mirako AI'} API Ayarları
                             </h2>
                         </div>
                         <div className="modal-body">
@@ -630,8 +738,8 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ selectedClient }) => {
                                     </>
                                 ) : (
                                     <>
-                                        Higgsfield video üretimi için API anahtarı gereklidir.
-                                        <a href="https://platform.higgsfield.ai/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)' }}>
+                                        Mirako AI video üretimi için API anahtarı gereklidir.
+                                        <a href="https://mirako.co/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)' }}>
                                             {' '}Buradan{' '}
                                         </a>
                                         API anahtarı alabilirsiniz.
@@ -643,7 +751,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ selectedClient }) => {
                                 <input
                                     type="password"
                                     className="input"
-                                    placeholder={provider === 'kling' ? 'fal-xxxx...' : 'ID:SECRET...'}
+                                    placeholder={provider === 'kling' ? 'fal-xxxx...' : 'mi_xxxx...'}
                                     value={apiKey}
                                     onChange={(e) => setApiKey(e.target.value)}
                                 />

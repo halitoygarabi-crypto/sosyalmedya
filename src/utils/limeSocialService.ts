@@ -11,7 +11,7 @@ export interface LimeSocialAccount {
 export interface LimeSocialMeResponse {
     credits?: number;
     creditsRemaining?: number;
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 export interface LimeSocialPostPayload {
