@@ -1,6 +1,6 @@
 import type { Post, Platform } from '../types';
 
-const LIMESOCIAL_API_URL = 'https://api.limesocial.io/api/v1';
+const LIMESOCIAL_API_URL = 'https://api.limesocial.io/v1';
 const API_KEY = import.meta.env.VITE_LIMESOCIAL_API_KEY || '';
 
 export interface LimeSocialAccount {
@@ -77,7 +77,8 @@ export const limeSocialService = {
             if (finalPostType === 'story') finalPostType = 'stories';
 
             const payload: LimeSocialPostPayload = {
-                title: post.content,
+                title: post.title || post.content,
+                description: post.content,
                 accounts: targetAccounts,
                 postType: finalPostType,
             };
@@ -198,4 +199,29 @@ export const limeSocialService = {
             return { success: false, message: message };
         }
     },
+
+    /**
+     * Get post history/jobs from LimeSocial
+     */
+    getHistory: async (apiKey?: string): Promise<{ success: boolean; data?: unknown[]; error?: string }> => {
+        try {
+            const key = apiKey || API_KEY;
+            if (!key) throw new Error('API Key bulunamadı');
+
+            const response = await fetch(`${LIMESOCIAL_API_URL}/history`, {
+                headers: { 'Authorization': key }
+            });
+
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            
+            const result = await response.json();
+            const historyData = Array.isArray(result) ? result : (result.data || []);
+            return { success: true, data: historyData };
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            return { success: false, error: message };
+        }
+    }
 };
+
+

@@ -18,13 +18,34 @@ interface PostListProps {
 }
 
 const PostList: React.FC<PostListProps> = ({ filter = 'all', limit, showActions = true }) => {
-    const { posts, selectedPlatform, searchQuery, deletePost, updatePost, activeClient, publishPost } = useDashboard();
+    const { posts, selectedPlatform, searchQuery, deletePost, updatePost, activeClient, publishPost, isLoading } = useDashboard();
+
+    // Loading State with Skeletons
+    if (isLoading) {
+        return (
+            <div className="post-list">
+                {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="post-item" style={{ gap: '16px' }}>
+                        <div className="skeleton" style={{ width: '56px', height: '56px', borderRadius: '8px', flexShrink: 0 }} />
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div className="skeleton" style={{ width: '40%', height: '16px', borderRadius: '4px' }} />
+                            <div className="skeleton" style={{ width: '90%', height: '12px', borderRadius: '4px' }} />
+                            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                                <div className="skeleton" style={{ width: '60px', height: '12px', borderRadius: '4px' }} />
+                                <div className="skeleton" style={{ width: '80px', height: '12px', borderRadius: '4px' }} />
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        );
+    }
 
     // Filter posts
     let filteredPosts = posts;
 
     // Filter by active client
-    if (activeClient) {
+    if (activeClient && activeClient.id !== 'all_clients') {
         filteredPosts = filteredPosts.filter((p) => p.clientId === activeClient.id);
     }
 

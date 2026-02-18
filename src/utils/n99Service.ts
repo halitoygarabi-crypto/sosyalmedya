@@ -13,27 +13,30 @@ import type { LimeSocialSettings } from './limeSocialService';
  */
 
 export const n99Service = {
-    // Mock fetch posts (could use supabaseService here)
+    // Fetch posts from Supabase or memory
     fetchPosts: async (): Promise<Post[]> => {
-        return [];
+        const { supabaseService } = await import('./supabaseService');
+        return supabaseService.fetchPosts();
     },
 
-    // Handle post creation locally
-    createPost: async (postData: Partial<Post>): Promise<boolean> => {
-        console.log('📝 Post oluşturuluyor (Local):', postData);
-        // If we want to persist, we could call supabaseService.addPost(postData)
-        return true;
+    // Handle post creation in Supabase
+    createPost: async (postData: Post): Promise<boolean> => {
+        console.log('📝 Post veritabanına kaydediliyor:', postData);
+        const { supabaseService } = await import('./supabaseService');
+        return supabaseService.createPost(postData);
     },
 
-    // Fetch stats
+    // Fetch stats from Supabase
     fetchStats: async (): Promise<PlatformStats[]> => {
-        return [];
+        const { supabaseService } = await import('./supabaseService');
+        return supabaseService.fetchStats();
     },
 
-    // Update post
+    // Update post in Supabase
     updatePost: async (id: string, updates: Partial<Post>): Promise<boolean> => {
-        console.log('📝 Post güncelleniyor (Local):', id, updates);
-        return true;
+        console.log('📝 Post güncelleniyor:', id, updates);
+        const { supabaseService } = await import('./supabaseService');
+        return supabaseService.updatePost(id, updates);
     },
 
     /**
@@ -113,13 +116,12 @@ export const n99Service = {
     },
 
     // Direct publishing to LimeSocial
-    publishToLimeSocial: async (post: Post, limeSocialSettings: LimeSocialSettings): Promise<boolean> => {
+    publishToLimeSocial: async (post: Post, limeSocialSettings: LimeSocialSettings): Promise<{ success: boolean; error?: string }> => {
         try {
-            const result = await limeSocialService.publishPost(post, limeSocialSettings);
-            return result.success;
+            return await limeSocialService.publishPost(post, limeSocialSettings);
         } catch (error) {
             console.error('Publish Error:', error);
-            return false;
+            return { success: false, error: error instanceof Error ? error.message : 'Bilinmeyen hata' };
         }
     }
 };

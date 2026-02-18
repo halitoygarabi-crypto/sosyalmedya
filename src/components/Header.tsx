@@ -38,6 +38,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onNewPost, companyName, on
         activeClient,
         clients,
         setActiveClientId,
+        limeSocialSettings,
     } = useDashboard();
     const { isAdmin } = useAuth();
 
@@ -102,9 +103,9 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onNewPost, companyName, on
                                 day: 'numeric',
                             })}
                         </p>
-                        <div className="badge badge-success" style={{ fontSize: '0.65rem', padding: '1px 8px' }}>
+                        <div className={`badge ${limeSocialSettings?.apiKey ? 'badge-success' : 'badge-error'}`} style={{ fontSize: '0.65rem', padding: '1px 8px' }}>
                             <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'currentColor', marginRight: '4px' }}></div>
-                            LimeSocial API: Aktif
+                            LimeSocial API: {limeSocialSettings?.apiKey ? 'Bağlı' : 'Bağlı Değil'}
                         </div>
                     </div>
                 </div>

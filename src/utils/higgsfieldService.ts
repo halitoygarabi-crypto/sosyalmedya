@@ -29,20 +29,24 @@ class HiggsfieldService {
     }
 
     getApiKey(): string {
-        // First check Higgsfield key
-        const localKey = localStorage.getItem('higgsfield_api_key');
-        if (localKey && localKey.trim()) {
-            return localKey.trim();
+        // Priority 1: direct higgsfield_api_key (fal.ai)
+        const localHKey = localStorage.getItem('higgsfield_api_key');
+        if (localHKey && localHKey.trim().length > 10) {
+            return localHKey.trim();
         }
 
-        // Fall back to fal.ai key
+        // Priority 2: direct ltx_api_key (fal.ai)
         const falKey = localStorage.getItem('ltx_api_key');
-        if (falKey && falKey.trim()) {
+        if (falKey && falKey.trim().length > 10) {
             return falKey.trim();
         }
 
-        const envKey = import.meta.env.VITE_HIGGSFIELD_API_KEY || import.meta.env.VITE_FAL_API_KEY;
-        return envKey || '';
+        // Priority 3: Working FAL Environment Variable
+        const envKey = import.meta.env.VITE_FAL_API_KEY;
+        if (envKey && envKey.length > 10) return envKey.trim();
+
+        // Last resort: Legacy Higgsfield key
+        return import.meta.env.VITE_HIGGSFIELD_API_KEY || '';
     }
 
     /**

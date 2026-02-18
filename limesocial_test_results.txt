@@ -1,0 +1,9 @@
+Testing /v1/me with headers: {"Authorization":"u3SGTNhfUigMg5PSzOgSKzk947pqX3YlxH7WzBhQ2a6e07de"}
+Result: Status 200, Body: {"success":true,"data":{"name":"halit abi","email":"halitoygarabi@gmail.com","plan":"Pro Plan","credits":10},"accounts":[{"username":"kasktasarim_99","platform":"tiktok","can_post":true},{"username":"kasktasarimtr","platform":"instagram","can_post":true},{"username":"122108899149223010","platform":"facebook","can_post":true}],"access_platforms":{"tiktok":true,"instagram":true,"linkedin":true,"youtube":true,"facebook":true,"x":true,"reddit":true,"threads":true,"pinterest":true},"meta":{"api_version":"1.0","timestamp":"2026-02-15T10:44:28Z"}}
+
+Testing /v1/me with headers: {"Authorization":"Bearer u3SGTNhfUigMg5PSzOgSKzk947pqX3YlxH7WzBhQ2a6e07de"}
+Result: Status 200, Body: {"success":true,"data":{"name":"halit abi","email":"halitoygarabi@gmail.com","plan":"Pro Plan","credits":10},"accounts":[{"username":"kasktasarim_99","platform":"tiktok","can_post":true},{"username":"kasktasarimtr","platform":"instagram","can_post":true},{"username":"122108899149223010","platform":"facebook","can_post":true}],"access_platforms":{"tiktok":true,"instagram":true,"linkedin":true,"youtube":true,"facebook":true,"x":true,"reddit":true,"threads":true,"pinterest":true},"meta":{"api_version":"1.0","timestamp":"2026-02-15T10:44:28Z"}}
+
+Testing /v1/me with headers: {"x-api-key":"u3SGTNhfUigMg5PSzOgSKzk947pqX3YlxH7WzBhQ2a6e07de"}
+Result: Status 401, Body: {"success":false,"error":{"code":"UNAUTHORIZED","message":"Missing Authorization header","type":"authentication_error"},"meta":{"api_version":"1.0","timestamp":"2026-02-15T10:44:28Z"}}
+

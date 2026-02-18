@@ -8,26 +8,30 @@ import {
     Shield,
     ShieldAlert,
     AlertCircle,
+    Eye,
+    Terminal,
     X,
+
     Save,
     Key,
     Settings,
     Instagram,
     Twitter,
-    Image,
+    Image as ImageIcon,
     Linkedin,
     Globe,
     Mail,
     Phone,
     MapPin,
     Calendar,
-    Edit3,
-    Eye
+    Edit3
 } from 'lucide-react';
+import SystemLogs from './Admin/components/SystemLogs';
 import { createClient } from '@supabase/supabase-js';
 import { supabase } from '../utils/supabaseService';
 import { useAuth } from '../context/AuthContext';
 import { useDashboard } from '../context/DashboardContext';
+import { useLog } from '../context/LogContext';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -138,7 +142,7 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({ customer, isO
     const tabs = [
         { id: 'info', label: 'Firma Bilgileri', icon: <Building2 size={16} /> },
         { id: 'api', label: 'API Bağlantıları', icon: <Key size={16} /> },
-        { id: 'influencers', label: 'AI Influencer', icon: <Image size={16} /> },
+        { id: 'influencers', label: 'AI Influencer', icon: <ImageIcon size={16} /> },
         { id: 'settings', label: 'Rol & Ayarlar', icon: <Settings size={16} /> },
     ];
 
@@ -634,10 +638,12 @@ const AdminPage: React.FC = () => {
 
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const { addLog } = useLog();
     const [searchTerm, setSearchTerm] = useState('');
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
+    const [activeTab, setActiveTab] = useState<'customers' | 'logs'>('customers');
 
     // New Customer Form State
     const [newEmail, setNewEmail] = useState('');
@@ -738,10 +744,12 @@ const AdminPage: React.FC = () => {
             setNewIndustry('');
             setShowAddModal(false);
 
+            addLog('success', `${newCompany} için müşteri hesabı oluşturuldu.`, 'Admin', { email: newEmail });
             fetchCustomers();
         } catch (error: unknown) {
             console.error('Add customer error:', error);
             const message = error instanceof Error ? error.message : 'Müşteri oluşturulamadı.';
+            addLog('error', `Müşteri ekleme hatası: ${message}`, 'Admin', { error, company: newCompany, email: newEmail });
             addNotification({
                 type: 'error',
                 message: 'Hata: ' + message,
@@ -858,8 +866,25 @@ const AdminPage: React.FC = () => {
         <div className="section animate-fadeIn" style={{ maxWidth: '100%', overflowX: 'hidden' }}>
             <div className="section-header" style={{ flexWrap: 'wrap', gap: 'var(--spacing-md)' }}>
                 <div>
-                    <h2 className="section-title">Müşteri Yönetimi</h2>
-                    <p className="text-muted text-sm">Sisteme kayıtlı tüm müşterileri yönetin ve yeni girişler yapın.</p>
+                    <h2 className="section-title">N99 Yönetici Paneli</h2>
+                    <div style={{ display: 'flex', gap: 'var(--spacing-md)', marginTop: 'var(--spacing-sm)' }}>
+                        <button 
+                            className={`btn ${activeTab === 'customers' ? 'btn-primary' : 'btn-ghost'}`} 
+                            onClick={() => setActiveTab('customers')}
+                            style={{ padding: '8px 16px' }}
+                        >
+                            <Users size={16} />
+                            Müşteri Yönetimi
+                        </button>
+                        <button 
+                            className={`btn ${activeTab === 'logs' ? 'btn-primary' : 'btn-ghost'}`} 
+                            onClick={() => setActiveTab('logs')}
+                            style={{ padding: '8px 16px' }}
+                        >
+                            <Terminal size={16} />
+                            Sistem Kayıtları
+                        </button>
+                    </div>
                 </div>
                 <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
                     <button className="btn btn-secondary" onClick={() => fetchCustomers()} disabled={isLoading}>
@@ -872,7 +897,11 @@ const AdminPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* Stats Overview */}
+            {activeTab === 'logs' ? (
+                <SystemLogs />
+            ) : (
+                <>
+                    {/* Stats Overview */}
             <div className="kpi-grid" style={{ marginBottom: 'var(--spacing-xl)' }}>
                 <div className="kpi-card">
                     <div className="kpi-icon" style={{ background: 'var(--info-bg)', color: 'var(--info)' }}>
@@ -1017,6 +1046,8 @@ const AdminPage: React.FC = () => {
                     </tbody>
                 </table>
             </div>
+            </>
+            )}
 
             {/* Customer Detail Modal */}
             <CustomerDetailModal

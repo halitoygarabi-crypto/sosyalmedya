@@ -37,6 +37,15 @@ export interface Client {
     assets?: ClientAsset[];
 }
 
+export interface AssignedClient {
+    id: string;
+    company_name: string;
+    industry: string | null;
+    logo_url: string | null;
+    ai_prompt_prefix?: string;
+    brand_guidelines?: string;
+}
+
 export interface Post {
     id: string;
     clientId: string;

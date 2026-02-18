@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { LogProvider } from './context/LogContext';
+import { NotificationProvider } from './context/NotificationContext';
+import { SettingsProvider } from './context/SettingsContext';
+import { PostProvider } from './context/PostContext';
 import { DashboardProvider, useDashboard } from './context/DashboardContext';
 import { LoginPage, RegisterPage, ClientDashboard, AdminLoginPage, AdminPage, CreatorDashboard } from './pages';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -29,7 +33,8 @@ import IntegrationsManager from './components/IntegrationsManager';
 import VideoGenerator from './components/VideoGenerator';
 import AIInfluencerGenerator from './components/AIInfluencerGenerator';
 import ContentHistory from './components/ContentHistory';
-import { Filter, CheckCircle, AlertCircle, Clock, ExternalLink, Trash2 } from 'lucide-react';
+import DistributionPlannerModal from './components/DistributionPlannerModal';
+import { Filter, CheckCircle, AlertCircle, Clock, ExternalLink, Trash2, Upload } from 'lucide-react';
 import { formatRelativeTime } from './utils/helpers';
 
 const DashboardContent: React.FC = () => {
@@ -49,6 +54,23 @@ const DashboardContent: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeSection, setActiveSection] = useState('dashboard');
   const [showNewPostModal, setShowNewPostModal] = useState(false);
+  const [showDistributionModal, setShowDistributionModal] = useState(false);
+  const [selectedLocalFile, setSelectedLocalFile] = useState<File | null>(null);
+
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleLocalUploadClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setSelectedLocalFile(e.target.files[0]);
+      setShowDistributionModal(true);
+    }
+  };
 
   // Apply dark/light mode
   useEffect(() => {
@@ -259,6 +281,17 @@ const DashboardContent: React.FC = () => {
                     <option value="failed">Başarısız</option>
                   </select>
                   <button className="btn btn-primary" onClick={() => setShowNewPostModal(true)}>İçerik Oluştur</button>
+                  <button className="btn btn-secondary" onClick={handleLocalUploadClick} style={{ display: 'flex', gap: '8px' }}>
+                    <Upload size={16} />
+                    Lokalden İçerik Yükle
+                  </button>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    style={{ display: 'none' }} 
+                    onChange={handleFileChange}
+                    accept="image/*,video/*"
+                  />
                 </div>
               </div>
               <div className="card">
@@ -513,6 +546,13 @@ const DashboardContent: React.FC = () => {
 
       {/* New Post Modal */}
       <NewPostModal isOpen={showNewPostModal} onClose={() => setShowNewPostModal(false)} />
+
+      {/* Distribution Planner Modal */}
+      <DistributionPlannerModal 
+        isOpen={showDistributionModal} 
+        onClose={() => setShowDistributionModal(false)} 
+        initialFile={selectedLocalFile}
+      />
     </div>
   );
 };
@@ -554,48 +594,53 @@ const RoleBasedRedirect: React.FC = () => {
   }
 };
 
-// Client Dashboard Wrapper
-
-
-const App: React.FC = () => {
+// Main App Component
+export const App: React.FC = () => {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <DashboardProvider>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/admin/login" element={<AdminLoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/admin" element={
-              <ProtectedRoute allowedRoles={['admin']}>
-                <DashboardContent />
-              </ProtectedRoute>
-            } />
-            <Route path="/client" element={
-              <ProtectedRoute allowedRoles={['client']}>
-                <ClientDashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/creator" element={
-              <ProtectedRoute allowedRoles={['content_creator', 'admin']}>
-                <CreatorDashboard />
-              </ProtectedRoute>
-            } />
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <RoleBasedRedirect />
+        <LogProvider>
+          <NotificationProvider>
+            <SettingsProvider>
+              <PostProvider>
+                <DashboardProvider>
+                  <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/admin/login" element={<AdminLoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/admin" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <DashboardContent />
                 </ProtectedRoute>
-              }
-            />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </DashboardProvider>
+              } />
+              <Route path="/client" element={
+                <ProtectedRoute allowedRoles={['client']}>
+                  <ClientDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/creator" element={
+                <ProtectedRoute allowedRoles={['content_creator', 'admin']}>
+                  <CreatorDashboard />
+                </ProtectedRoute>
+              } />
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <RoleBasedRedirect />
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+                </DashboardProvider>
+              </PostProvider>
+            </SettingsProvider>
+          </NotificationProvider>
+        </LogProvider>
       </AuthProvider>
     </BrowserRouter>
   );
 };
 
 export default App;
-

@@ -12,7 +12,7 @@ import { useDashboard } from '../context/DashboardContext';
 import { formatNumber } from '../utils/helpers';
 
 const KPICards: React.FC = () => {
-    const { posts, activeClient, platformStats } = useDashboard();
+    const { posts, activeClient, platformStats, isLoading } = useDashboard();
 
     const clientPosts = activeClient
         ? posts.filter(p => p.clientId === activeClient.id)
@@ -104,6 +104,21 @@ const KPICards: React.FC = () => {
             color: 'var(--error)',
         },
     ];
+
+    if (isLoading) {
+        return (
+            <div className="kpi-grid">
+                {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="kpi-card" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div className="skeleton" style={{ width: '48px', height: '48px', borderRadius: '12px', marginBottom: '8px' }} />
+                        <div className="skeleton" style={{ width: '60%', height: '24px', borderRadius: '4px' }} />
+                        <div className="skeleton" style={{ width: '40%', height: '16px', borderRadius: '4px' }} />
+                        <div className="skeleton" style={{ width: '80%', height: '12px', borderRadius: '4px', marginTop: 'auto' }} />
+                    </div>
+                ))}
+            </div>
+        );
+    }
 
     return (
         <div className="kpi-grid">

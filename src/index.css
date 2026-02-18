@@ -1,3 +1,46 @@
+/* Skeleton Loading Styles */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-secondary) 25%,
+    var(--bg-tertiary) 50%,
+    var(--bg-secondary) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-md);
+  display: inline-block;
+}
+
+.skeleton-text {
+  height: 1em;
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+.skeleton-title {
+  height: 1.5em;
+  width: 60%;
+  margin-bottom: 1rem;
+}
+.skeleton-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+.skeleton-card {
+  height: 120px;
+  width: 100%;
+}
+
 /* ========================================
    N99 Social Media Dashboard - Design System
    ======================================== */
@@ -21,13 +64,25 @@
   /* Accent Colors */
   --accent-primary: #6366f1;
   --accent-secondary: #8b5cf6;
-  --accent-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+  --accent-gradient: linear-gradient(
+    135deg,
+    #6366f1 0%,
+    #8b5cf6 50%,
+    #a855f7 100%
+  );
 
   /* Platform Colors */
-  --instagram: #E4405F;
-  --instagram-gradient: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
-  --twitter: #1DA1F2;
-  --linkedin: #0A66C2;
+  --instagram: #e4405f;
+  --instagram-gradient: linear-gradient(
+    45deg,
+    #f09433 0%,
+    #e6683c 25%,
+    #dc2743 50%,
+    #cc2366 75%,
+    #bc1888 100%
+  );
+  --twitter: #1da1f2;
+  --linkedin: #0a66c2;
   --tiktok: #00f2ea;
   --tiktok-gradient: linear-gradient(135deg, #00f2ea 0%, #ff0050 100%);
 
@@ -75,8 +130,9 @@
   --transition-slow: 350ms ease;
 
   /* Typography */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-sans:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
 }
 
 /* Light Mode - Light Ocean Theme */
@@ -106,7 +162,12 @@
 
   --accent-primary: #2563eb;
   --accent-secondary: #3b82f6;
-  --accent-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%);
+  --accent-gradient: linear-gradient(
+    135deg,
+    #3b82f6 0%,
+    #2563eb 50%,
+    #1d4ed8 100%
+  );
 }
 
 /* Reset & Base */
@@ -390,7 +451,7 @@ a:hover {
 }
 
 .kpi-card::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
@@ -562,7 +623,7 @@ a:hover {
 }
 
 .platform-card::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
@@ -880,7 +941,7 @@ a:hover {
 }
 
 .toggle-slider::before {
-  content: '';
+  content: "";
   position: absolute;
   height: 18px;
   width: 18px;
@@ -891,12 +952,12 @@ a:hover {
   transition: all var(--transition-fast);
 }
 
-.toggle input:checked+.toggle-slider {
+.toggle input:checked + .toggle-slider {
   background: var(--accent-primary);
   border-color: var(--accent-primary);
 }
 
-.toggle input:checked+.toggle-slider::before {
+.toggle input:checked + .toggle-slider::before {
   transform: translateX(22px);
   background: white;
 }
@@ -1342,7 +1403,7 @@ a:hover {
 }
 
 .calendar-day.has-posts::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: 4px;
   width: 4px;
@@ -1387,7 +1448,7 @@ a:hover {
 }
 
 .tab.active::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: -1px;
   left: 0;
@@ -1517,10 +1578,12 @@ a:hover {
    ======================================== */
 
 .skeleton {
-  background: linear-gradient(90deg,
-      var(--bg-tertiary) 25%,
-      var(--bg-hover) 50%,
-      var(--bg-tertiary) 75%);
+  background: linear-gradient(
+    90deg,
+    var(--bg-tertiary) 25%,
+    var(--bg-hover) 50%,
+    var(--bg-tertiary) 75%
+  );
   background-size: 200% 100%;
   animation: skeletonShimmer 1.5s infinite;
   border-radius: var(--radius-md);
@@ -1607,7 +1670,6 @@ a:hover {
 }
 
 @keyframes pulse {
-
   0%,
   100% {
     transform: scale(1);
@@ -1700,7 +1762,6 @@ a:hover {
 }
 
 @media (max-width: 768px) {
-
   .grid-2,
   .grid-3,
   .grid-4 {
@@ -2109,20 +2170,28 @@ a:hover {
 }
 
 .auth-page::before {
-  content: '';
+  content: "";
   position: absolute;
   top: -50%;
   left: -50%;
   width: 200%;
   height: 200%;
-  background: radial-gradient(circle at 30% 20%, rgba(37, 99, 235, 0.1) 0%, transparent 40%),
-    radial-gradient(circle at 70% 80%, rgba(29, 78, 216, 0.08) 0%, transparent 40%);
+  background:
+    radial-gradient(
+      circle at 30% 20%,
+      rgba(37, 99, 235, 0.1) 0%,
+      transparent 40%
+    ),
+    radial-gradient(
+      circle at 70% 80%,
+      rgba(29, 78, 216, 0.08) 0%,
+      transparent 40%
+    );
   animation: float 20s ease-in-out infinite;
   pointer-events: none;
 }
 
 @keyframes float {
-
   0%,
   100% {
     transform: translate(0, 0) rotate(0deg);

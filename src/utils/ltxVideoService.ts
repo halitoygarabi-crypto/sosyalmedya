@@ -31,38 +31,39 @@ export interface VideoGenerationStatus {
 }
 
 class LTXVideoService {
-    private apiKey: string = '';
     private baseUrl: string = 'https://fal.run';
 
+
     setApiKey(key: string) {
-        this.apiKey = key;
         localStorage.setItem('ltx_api_key', key);
     }
 
+
     getApiKey(): string {
-        // Centralized AI Settings (from DashboardContext)
+        // Priority 1: ai_settings from localStorage
         try {
             const savedSettings = localStorage.getItem('ai_settings');
             if (savedSettings) {
                 const settings = JSON.parse(savedSettings);
-                if (settings.falKey) return settings.falKey.trim();
+                if (settings.falKey && settings.falKey.trim().length > 10) {
+                    return settings.falKey.trim();
+                }
             }
-        } catch {
-            console.error('Failed to parse ai_settings in ltxVideoService');
-        }
+        } catch {}
 
-        // Priority: LocalStorage (manual entry) > Environment Variable
+        // Priority 2: direct ltx_api_key
         const localKey = localStorage.getItem('ltx_api_key');
-        if (localKey && localKey.trim()) {
+        if (localKey && localKey.trim().length > 10) {
             return localKey.trim();
         }
 
+        // Priority 3: Environment Variable (VITE_FAL_API_KEY is the working one)
         const envKey = import.meta.env.VITE_FAL_API_KEY;
-        if (envKey && envKey !== 'senin-yeni-anahtarin') {
+        if (envKey && envKey.length > 10) {
             return envKey.trim();
         }
 
-        return this.apiKey || '';
+        return '';
     }
 
     async generateFromText(request: VideoGenerationRequest): Promise<VideoGenerationResponse> {
@@ -72,18 +73,19 @@ class LTXVideoService {
         }
 
         try {
-            console.log('🎬 Kling AI Video üretimi başlatılıyor...');
+            const maskedKey = `${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}`;
+            console.log(`🎬 Kling AI Video üretimi başlatılıyor... (Key: ${maskedKey})`);
             
-            const response = await fetch(`${this.baseUrl}/fal-ai/kling-video/v1/standard/text-to-video`, {
+            const response = await fetch(`${this.baseUrl}/fal-ai/kling-video/v1.6/standard/text-to-video`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Key ${apiKey}`,
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    prompt: request.prompt,
+                    prompt: request.prompt.length > 1000 ? request.prompt.substring(0, 999) : request.prompt,
                     negative_prompt: request.negativePrompt || 'blurry, low quality, distorted, ugly',
-                    duration: request.duration || '5',
+                    duration: (request.duration || 5) > 5 ? "10" : "5",
                     aspect_ratio: this.mapAspectRatio(request.aspectRatio || '16:9'),
                 }),
             });
@@ -128,9 +130,10 @@ class LTXVideoService {
         }
 
         try {
-            console.log('🎬 Kling AI Image-to-Video üretimi başlatılıyor...');
+            const maskedKey = `${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}`;
+            console.log(`🎬 Kling AI Image-to-Video üretimi başlatılıyor... (Key: ${maskedKey})`);
 
-            const response = await fetch(`${this.baseUrl}/fal-ai/kling-video/v1/standard/image-to-video`, {
+            const response = await fetch(`${this.baseUrl}/fal-ai/kling-video/v1.6/standard/image-to-video`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Key ${apiKey}`,
@@ -138,9 +141,9 @@ class LTXVideoService {
                 },
                 body: JSON.stringify({
                     image_url: request.imageUrl,
-                    prompt: request.prompt,
+                    prompt: request.prompt.length > 1000 ? request.prompt.substring(0, 999) : request.prompt,
                     negative_prompt: request.negativePrompt || 'blurry, low quality, distorted',
-                    duration: request.duration || '5',
+                    duration: (request.duration || 5) > 5 ? "10" : "5",
                 }),
             });
 

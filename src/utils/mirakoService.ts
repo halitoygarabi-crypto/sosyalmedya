@@ -71,14 +71,19 @@ class MirakoService {
 
             if (isMotion) {
                 // Avatar Motion schema: image (string URL), audio (string prompt), positive_prompt, negative_prompt
+                // Truncate prompt to 512 characters for Mirako API limit
+                const truncatedPrompt = request.prompt.length > 512 ? request.prompt.substring(0, 511) : request.prompt;
+                
                 payload.image = request.imageUrl;
-                payload.audio = request.prompt;
-                payload.positive_prompt = request.prompt;
+                payload.audio = truncatedPrompt;
+                payload.positive_prompt = truncatedPrompt;
                 payload.negative_prompt = request.negativePrompt || 'nsfw, low quality, blurry, distorted, low resolution';
             } else {
                 // Talking Avatar schema: image (string URL), audio (string prompt)
+                const truncatedPrompt = request.prompt.length > 512 ? request.prompt.substring(0, 511) : request.prompt;
+                
                 payload.image = request.imageUrl;
-                payload.audio = request.prompt;
+                payload.audio = truncatedPrompt;
                 payload.negative_prompt = request.negativePrompt || 'nsfw, low quality, blurry';
             }
 

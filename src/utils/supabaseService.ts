@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { Post, PlatformStats, Notification } from '../types';
+import type { Post, PlatformStats, Notification, Client } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -9,7 +9,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 // Helper: DB row'u Post tipine dönüştür
 const rowToPost = (row: Record<string, unknown>): Post => ({
     id: row.id as string,
-    clientId: (row.client_id as string) || 'default',
+    clientId: (row.customer_id as string) || 'default',
     title: row.title as string,
     content: row.content as string,
     imageUrls: (row.image_urls as string[]) || [],
@@ -31,7 +31,7 @@ const rowToPost = (row: Record<string, unknown>): Post => ({
 // Helper: Post'u DB row'a dönüştür
 const postToRow = (post: Post) => ({
     id: post.id,
-    client_id: post.clientId,
+    customer_id: post.clientId,
     title: post.title,
     content: post.content,
     image_urls: post.imageUrls,
@@ -50,6 +50,48 @@ const postToRow = (post: Post) => ({
 
 export const supabaseService = {
     // Postları getir
+    // --- Client / Customer Management ---
+    fetchClients: async (): Promise<Client[]> => {
+        const { data, error } = await supabase
+            .from('clients_profiles')
+            .select('*')
+            .order('company_name', { ascending: true });
+
+        if (error) {
+            console.error('Error fetching clients:', error);
+            return [];
+        }
+        return data || [];
+    },
+
+    createClient: async (client: Omit<Client, 'id' | 'created_at'>): Promise<Client | null> => {
+        const { data, error } = await supabase
+            .from('clients_profiles')
+            .insert([client])
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Error creating client:', error);
+            return null;
+        }
+        return data;
+    },
+
+    updateClient: async (id: string, updates: Partial<Client>): Promise<boolean> => {
+        const { error } = await supabase
+            .from('clients_profiles')
+            .update(updates)
+            .eq('id', id);
+
+        if (error) {
+            console.error('Error updating client:', error);
+            return false;
+        }
+        return true;
+    },
+
+    // --- Original Services ---
     fetchPosts: async (): Promise<Post[]> => {
         try {
             const { data, error } = await supabase

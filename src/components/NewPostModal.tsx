@@ -192,16 +192,22 @@ const NewPostModal: React.FC<NewPostModalProps> = ({ isOpen, onClose }) => {
 
         addPost(newPost);
 
-        // If posting immediately, also publish to LimeSocial
-        if (postStatus === 'posted' && limeSocialSettings?.apiKey) {
+        // Publish to LimeSocial (immediately if 'posted', or scheduled if status is 'scheduled')
+        if ((postStatus === 'posted' || postStatus === 'scheduled') && limeSocialSettings?.apiKey) {
+            const actionType = postStatus === 'posted' ? 'yayınlanıyor' : 'planlanıyor';
+            addNotification({ type: 'info', message: `LimeSocial üzerinden ${actionType}...`, read: false });
+            
             n99Service.publishToLimeSocial(newPost, limeSocialSettings).then(success => {
                 if (success) {
-                    addNotification({ type: 'success', message: `✅ ${platforms.join(', ')} platformlarına yayınlandı!`, read: false });
+                    const successMsg = postStatus === 'posted' 
+                        ? `✅ ${platforms.join(', ')} platformlarına yayınlandı!` 
+                        : `📅 ${platforms.join(', ')} için planlama başarılı!`;
+                    addNotification({ type: 'success', message: successMsg, read: false });
                 } else {
-                    addNotification({ type: 'warning', message: '⚠️ LimeSocial yayını başarısız. İçerik kaydedildi.', read: false });
+                    addNotification({ type: 'warning', message: '⚠️ LimeSocial işlemi başarısız. İçerik sadece yerel kaydedildi.', read: false });
                 }
             }).catch(() => {
-                addNotification({ type: 'warning', message: '⚠️ LimeSocial bağlantı hatası. İçerik kaydedildi.', read: false });
+                addNotification({ type: 'warning', message: '⚠️ LimeSocial bağlantı hatası. İçerik sadece yerel kaydedildi.', read: false });
             });
         }
 

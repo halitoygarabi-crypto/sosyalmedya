@@ -592,7 +592,7 @@ const LimeSocialSettingsCard: React.FC = () => {
     const testConnection = async () => {
         addNotification({ type: 'info', message: 'LimeSocial bağlantısı test ediliyor...', read: false });
         try {
-            const response = await fetch('https://api.limesocial.io/api/v1/me', {
+            const response = await fetch('https://api.limesocial.io/v1/me', {
                 headers: {
                     'Authorization': localLimeSettings.apiKey
                 }
