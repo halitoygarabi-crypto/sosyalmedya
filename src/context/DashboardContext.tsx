@@ -66,7 +66,7 @@ interface DashboardContextType {
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
 
 export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const { posts, setPosts, addPost, updatePost, deletePost, platformStats: postStats } = usePosts();
+    const { posts, setPosts, addPost, updatePost, deletePost, platformStats: postStats, isLoading: postsLoading } = usePosts();
     const { notifications, addNotification, markAsRead, clearNotifications } = useNotifications();
     const { darkMode, setDarkMode, activeClientId, setActiveClientId, aiSettings: sharedAiSettings, updateAISettings } = useSettings();
 
@@ -80,17 +80,24 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
         autoReply: false
     });
     const [searchQuery, setSearchQuery] = useState('');
-    const [isLoading] = useState(false);
+    
+    // Default settings from ENV
+    const [limeSocialSettings, setLimeSocialSettings] = useState({ 
+        apiKey: import.meta.env.VITE_LIMESOCIAL_API_KEY || '', 
+        accounts: '' 
+    });
+    const [googleSheetsSettings, setGoogleSheetsSettings] = useState({ 
+        webhookUrl: import.meta.env.VITE_GOOGLE_SHEETS_CONTENT_URL || '' 
+    });
+    const [n99Settings, setN99Settings] = useState({ 
+        webhookUrl: import.meta.env.VITE_N99_WEBHOOK_URL || '' 
+    });
+
     const [clients] = useState<Client[]>([]);
     const [dailyEngagement] = useState<DailyEngagement[]>([]);
     
-    const [limeSocialSettings, setLimeSocialSettings] = useState({ apiKey: '', accounts: '' });
-    const [googleSheetsSettings, setGoogleSheetsSettings] = useState({ webhookUrl: '' });
-    const [n99Settings, setN99Settings] = useState({ webhookUrl: '' });
-
     const activeClient = clients.find(c => c.id === activeClientId) || null;
     
-    // Convert to legacy type
     const platformStatsArray: PlatformStats[] = [
         { clientId: activeClientId || 'default', platform: 'instagram', postsCount: postStats.instagram, avgEngagementRate: 4.2, followers: 1200, followerGrowth: 12, bestPostingTime: '18:00', reach: 5000, impressions: 8000 },
         { clientId: activeClientId || 'default', platform: 'twitter', postsCount: postStats.youtube, avgEngagementRate: 2.8, followers: 850, followerGrowth: -3, bestPostingTime: '12:00', reach: 3200, impressions: 4500 },
@@ -110,11 +117,14 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
     const value: DashboardContextType = {
         posts, notifications, isDarkMode: darkMode,
         selectedPlatform, selectedStatus, automationEnabled, automationSettings,
-        searchQuery, isLoading, clients, activeClient,
+        searchQuery, isLoading: postsLoading, clients, activeClient,
         platformStats: platformStatsArray,
         dailyEngagement,
         limeSocialSettings,
-        aiSettings: { replicateKey: '', falKey: sharedAiSettings.falKey },
+        aiSettings: { 
+            replicateKey: import.meta.env.VITE_REPLICATE_API_KEY || '', 
+            falKey: sharedAiSettings.falKey || import.meta.env.VITE_FAL_API_KEY || '' 
+        },
         googleSheetsSettings,
         n99Settings,
         

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Users, Megaphone, Settings, Sparkles, RefreshCw, Loader2 } from 'lucide-react';
+import { Users, Megaphone, Settings, Sparkles, Loader2 } from 'lucide-react';
 import { useDashboard } from '../../context/DashboardContext';
 
 // Services

@@ -16,6 +16,7 @@ interface PostContextType {
     updatePost: (id: string, updates: Partial<Post>) => void;
     deletePost: (id: string) => void;
     platformStats: PlatformStats;
+    isLoading: boolean;
     refreshData: () => Promise<void>;
 }
 
@@ -61,7 +62,7 @@ export const PostProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return (
         <PostContext.Provider value={{ 
             posts, setPosts, addPost, updatePost, deletePost, 
-            platformStats, refreshData 
+            platformStats, isLoading: isRefreshing, refreshData 
         }}>
             {children}
         </PostContext.Provider>

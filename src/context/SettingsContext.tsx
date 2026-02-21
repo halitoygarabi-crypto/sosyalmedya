@@ -32,7 +32,13 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     
     const [aiSettings, setAiSettings] = useState<AISettings>(() => {
         const saved = localStorage.getItem('ai_settings');
-        return saved ? JSON.parse(saved) : { falKey: '', mirakoKey: '', ltxKey: '', openaiKey: '' };
+        const defaultSettings = { 
+            falKey: import.meta.env.VITE_FAL_API_KEY || '', 
+            mirakoKey: '', 
+            ltxKey: import.meta.env.VITE_REPLICATE_API_KEY || '', 
+            openaiKey: import.meta.env.VITE_OPENAI_API_KEY || '' 
+        };
+        return saved ? { ...defaultSettings, ...JSON.parse(saved) } : defaultSettings;
     });
 
     const updateAISettings = useCallback((newSettings: Partial<AISettings>) => {

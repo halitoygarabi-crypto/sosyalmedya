@@ -14,7 +14,8 @@ export const storageService = {
             
             // Upload to Supabase 'media' bucket
             const path = `generated/${Date.now()}_${fileName}`;
-            const { data, error } = await supabase.storage
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const { error } = await (supabase as any).storage
                 .from('media')
                 .upload(path, blob, {
                     contentType: 'image/png',
@@ -24,7 +25,8 @@ export const storageService = {
             if (error) throw error;
 
             // Get Public URL
-            const { data: { publicUrl } } = supabase.storage
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const { data: { publicUrl } } = (supabase as any).storage
                 .from('media')
                 .getPublicUrl(path);
 
