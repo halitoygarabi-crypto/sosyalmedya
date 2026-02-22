@@ -9,9 +9,10 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 async function forceAdmin() {
     // Sign in to get user
     const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: 'admin@test.com',
+        email: 'admin2@test.com',
         password: '123456'
     });
+
 
     if (signInError) {
         console.error('Sign in error:', signInError.message);

@@ -1,4 +1,4 @@
-// Script to check existing users and make one admin
+
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = 'https://fmcpztikisyauhbzbbvd.supabase.co';
@@ -6,34 +6,44 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-async function listUsers() {
-    console.log('Fetching customer profiles...\n');
-
-    const { data, error } = await supabase
-        .from('customer_profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-    if (error) {
-        console.error('Error:', error.message);
-        return;
+async function checkUsers() {
+    console.log('--- Auth Users ---');
+    // Auth users can't be listed with anon key, but we can try to sign in
+    const emails = ['admin2@test.com', 'admin@test.com'];
+    for (const email of emails) {
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password: '123456'
+        });
+        if (error) {
+            console.log(`${email}: Sign in failed - ${error.message}`);
+        } else {
+            console.log(`${email}: Sign in success! ID: ${data.user.id}`);
+            
+            // Check Profile
+            const { data: profile, error: profileError } = await supabase
+                .from('customer_profiles')
+                .select('*')
+                .eq('id', data.user.id);
+            
+            console.log(`Profile for ${email}:`, profile ? profile[0] : 'NOT FOUND');
+            
+            if (profile && profile.length === 0) {
+                console.log(`⚠️ Profile missing for ${email}, creating...`);
+                await supabase.from('customer_profiles').insert({
+                    id: data.user.id,
+                    company_name: 'Admin Company',
+                    is_admin: true,
+                    role: 'admin'
+                });
+                console.log('✅ Profile created and set as admin.');
+            } else if (profile && !profile[0].is_admin) {
+                console.log(`⚠️ User is not admin, updating...`);
+                await supabase.from('customer_profiles').update({ is_admin: true, role: 'admin' }).eq('id', data.user.id);
+                console.log('✅ Admin flag updated.');
+            }
+        }
     }
-
-    if (!data || data.length === 0) {
-        console.log('No users found. Please register first at http://localhost:5173/register');
-        return;
-    }
-
-    console.log('Found users:');
-    console.log('='.repeat(60));
-    data.forEach((user, i) => {
-        console.log(`${i + 1}. ${user.company_name}`);
-        console.log(`   ID: ${user.id}`);
-        console.log(`   Industry: ${user.industry || 'N/A'}`);
-        console.log(`   Admin: ${user.is_admin ? '✅ Yes' : '❌ No'}`);
-        console.log(`   Created: ${new Date(user.created_at).toLocaleDateString('tr-TR')}`);
-        console.log('-'.repeat(60));
-    });
 }
 
-listUsers();
+checkUsers();

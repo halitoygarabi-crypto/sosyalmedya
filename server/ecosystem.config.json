@@ -1,0 +1,20 @@
+{
+  "apps": [
+    {
+      "name": "socialhub-api",
+      "script": "dist/index.js",
+      "cwd": "/root/.openclaw/workspace/backend/socialhub-server",
+      "env": {
+        "NODE_ENV": "production",
+        "PORT": "3001"
+      },
+      "instances": 1,
+      "exec_mode": "fork",
+      "autorestart": true,
+      "watch": false,
+      "max_memory_restart": "256M",
+      "log_date_format": "YYYY-MM-DD HH:mm:ss",
+      "merge_logs": true
+    }
+  ]
+}

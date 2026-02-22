@@ -6,10 +6,26 @@ import { supabase } from './supabaseClient';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
-app.use(cors());
+app.use(cors({
+    origin: [
+        'http://localhost:5173',
+        'http://localhost:3000',
+        'https://socialhub.polmarkai.pro',
+        'https://api.socialhub.polmarkai.pro'
+    ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    credentials: true
+}));
 app.use(express.json());
+
+// Log middleware
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+});
+
 
 // --- Müşteri (Client) İşlemleri ---
 app.get('/api/clients', async (req, res) => {
@@ -55,16 +71,47 @@ app.get('/api/posts', async (req, res) => {
     res.json(data);
 });
 
+// --- Kullanıcı Profil (Customer Profile) İşlemleri ---
+app.get('/api/profiles/:id', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('customer_profiles')
+            .select('*')
+            .eq('id', req.params.id);
+
+        if (error) {
+            console.error('Supabase error fetching profile:', error);
+            return res.status(500).json({ error: error.message });
+        }
+
+        if (!data || data.length === 0) {
+            console.log(`No profile found for ID: ${req.params.id}`);
+            return res.status(404).json({ error: 'Profile not found' });
+        }
+
+        res.json(data[0]);
+    } catch (err) {
+        console.error('Crash in /api/profiles/:id:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.put('/api/profiles/:id', async (req, res) => {
+    const { error } = await supabase
+        .from('customer_profiles')
+        .update(req.body)
+        .eq('id', req.params.id);
+
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+});
+
 // --- Polmark & Sheets Entegrasyon Proxy ---
-// Bu route'lar frontend'in yeni env değişkenleri üzerinden backend'i bir köprü (proxy) gibi kullanmasını sağlar.
-app.all('/api/polmark*', async (req, res) => {
-    // Polmark API'si (n8n veya başka bir servis) için yönlendirme mantığı buraya gelir.
-    // Şimdilik sadece isteği aldığımızı onaylıyoruz.
+app.use('/api/polmark', async (req, res) => {
     res.json({ status: 'Polmark proxy active', path: req.path });
 });
 
-app.all('/api/sheets*', async (req, res) => {
-    // Google Sheets Apps Script proxy mantığı.
+app.use('/api/sheets', async (req, res) => {
     res.json({ status: 'Sheets proxy active', path: req.path });
 });
 
@@ -139,26 +186,11 @@ app.patch('/api/notifications/:id', async (req, res) => {
 });
 
 // Sağlık kontrolü
-// --- Kullanıcı Profil (Customer Profile) İşlemleri ---
-app.get('/api/profiles/:id', async (req, res) => {
-    const { data, error } = await supabase
-        .from('customer_profiles')
-        .select('*')
-        .eq('id', req.params.id)
-        .single();
 
-    if (error) return res.status(500).json({ error: error.message });
-    res.json(data);
-});
-
-app.put('/api/profiles/:id', async (req, res) => {
-    const { error } = await supabase
-        .from('customer_profiles')
-        .update(req.body)
-        .eq('id', req.params.id);
-
-    if (error) return res.status(500).json({ error: error.message });
-    res.json({ success: true });
+// --- Debug ---
+app.get('/api/debug-profiles', async (req, res) => {
+    const { data, error } = await supabase.from('customer_profiles').select('id, company_name, is_admin, role');
+    res.json({ data, error });
 });
 
 // --- Influencer İşlemleri ---

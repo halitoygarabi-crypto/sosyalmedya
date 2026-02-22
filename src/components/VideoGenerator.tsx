@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { ltxVideoService } from '../utils/ltxVideoService';
 import { mirakoService } from '../utils/mirakoService';
+import { polmarkService } from '../utils/polmarkService';
 import { googleSheetsService } from '../utils/googleSheetsService';
 import { llmService } from '../utils/llmService';
 import type { SheetEntry } from '../utils/googleSheetsService';
@@ -41,7 +42,7 @@ interface VideoGeneratorProps {
 }
 
 type GenerationMode = 'text-to-video' | 'image-to-video';
-type VideoProvider = 'kling' | 'mirako';
+type VideoProvider = 'kling' | 'mirako' | 'polmark';
 
 const VideoGenerator: React.FC<VideoGeneratorProps> = ({ selectedClient }) => {
     const { addNotification } = useDashboard();
@@ -65,6 +66,21 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ selectedClient }) => {
     const [showApiKeyModal, setShowApiKeyModal] = useState(false);
     const [apiKey, setApiKey] = useState(ltxVideoService.getApiKey());
     const [isUploading, setIsUploading] = useState(false);
+    const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+    // Timer for generation elapsed time
+    React.useEffect(() => {
+        let interval: ReturnType<typeof setInterval> | null = null;
+        if (isGenerating) {
+            setElapsedSeconds(0);
+            interval = setInterval(() => {
+                setElapsedSeconds(prev => prev + 1);
+            }, 1000);
+        } else {
+            setElapsedSeconds(0);
+        }
+        return () => { if (interval) clearInterval(interval); };
+    }, [isGenerating]);
 
     const handleGeneratePrompt = useCallback(async () => {
         if (!prompt.trim()) {
@@ -167,7 +183,9 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ selectedClient }) => {
 
         const isConfigured = provider === 'kling' 
             ? ltxVideoService.isConfigured() 
-            : mirakoService.isConfigured();
+            : provider === 'mirako'
+                ? mirakoService.isConfigured()
+                : polmarkService.isConfigured();
 
         if (!isConfigured) {
             setShowApiKeyModal(true);
@@ -210,7 +228,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ selectedClient }) => {
                 }
                 response = await ltxVideoService.generateFromImage(request);
             }
-        } else {
+        } else if (provider === 'mirako') {
             // Mirako AI
             response = await mirakoService.generateVideo({
                 prompt: request.prompt,
@@ -218,6 +236,15 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ selectedClient }) => {
                 aspectRatio: request.aspectRatio,
                 duration: request.duration,
                 negativePrompt: request.negativePrompt
+            });
+        } else {
+            // Polmark AI
+            response = await polmarkService.generateVideo({
+                prompt: request.prompt,
+                imageUrl: request.imageUrl,
+                aspectRatio: request.aspectRatio,
+                duration: request.duration,
+                mode: mode
             });
         }
 
@@ -257,12 +284,14 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ selectedClient }) => {
                 <div>
                     <h2 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
                         <Video size={24} style={{ color: 'var(--accent-primary)' }} />
-                        {provider === 'kling' ? 'Kling AI Video Üretici' : 'Mirako AI Video Üretici'}
+                        {provider === 'kling' ? 'Kling AI Video Üretici' : provider === 'mirako' ? 'Mirako AI Video Üretici' : 'Polmark AI Video Üretici'}
                     </h2>
                     <p className="text-muted text-sm">
                         {provider === 'kling' 
                             ? 'Fal.ai Kling modelleri ile sinematik AI videolar oluşturun' 
-                            : 'Mirako AI modelleri ile yüksek estetikli AI videolar oluşturun'}
+                            : provider === 'mirako'
+                                ? 'Mirako AI modelleri ile yüksek estetikli AI videolar oluşturun'
+                                : 'Polmark n99 Orchestration ile optimize edilmiş AI videolar oluşturun'}
                     </p>
                 </div>
                 <button
@@ -292,6 +321,13 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ selectedClient }) => {
                             style={{ flex: 1 }}
                         >
                             <span>Mirako AI</span>
+                        </button>
+                        <button
+                            className={`btn ${provider === 'polmark' ? 'btn-primary' : 'btn-ghost'}`}
+                            onClick={() => setProvider('polmark')}
+                            style={{ flex: 1 }}
+                        >
+                            <span>Polmark AI</span>
                         </button>
                     </div>
 
@@ -565,7 +601,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ selectedClient }) => {
                         {isGenerating ? (
                             <>
                                 <Loader2 size={20} className="spin" />
-                                <span>Video Üretiliyor...</span>
+                                <span>Video Üretiliyor... ({Math.floor(elapsedSeconds / 60)}:{String(elapsedSeconds % 60).padStart(2, '0')})</span>
                             </>
                         ) : (
                             <>
@@ -595,7 +631,8 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ selectedClient }) => {
                                 borderRadius: 'var(--radius-lg)'
                             }}>
                                 <div className="spinner" style={{ marginBottom: 'var(--spacing-md)' }} />
-                                <p className="text-muted">Video üretiliyor... Bu birkaç dakika sürebilir.</p>
+                                <p className="text-muted" style={{ marginBottom: '4px' }}>Video üretiliyor... ({Math.floor(elapsedSeconds / 60)}:{String(elapsedSeconds % 60).padStart(2, '0')})</p>
+                                <p className="text-muted" style={{ fontSize: '0.75rem', opacity: 0.7 }}>AI video üretimi genellikle 1-3 dakika sürer. Lütfen bekleyin.</p>
                             </div>
                         )}
 

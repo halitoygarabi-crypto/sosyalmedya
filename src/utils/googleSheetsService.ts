@@ -34,7 +34,9 @@ class GoogleSheetsService {
     syncConfigsFromEnv(): void {
         let configs = this.getConfigs();
         const influencerUrl = import.meta.env.VITE_GOOGLE_SHEETS_INFLUENCER_URL || '';
-        const contentUrl = import.meta.env.VITE_GOOGLE_SHEETS_CONTENT_URL || import.meta.env.VITE_GOOGLE_SHEETS_WEBHOOK_URL || '';
+        const contentUrl = import.meta.env.VITE_GOOGLE_SHEETS_CONTENT_URL || 
+                          import.meta.env.VITE_GOOGLE_SHEETS_WEBHOOK_URL || 
+                          import.meta.env.VITE_SHEETS_API || '';
 
         let changed = false;
 
