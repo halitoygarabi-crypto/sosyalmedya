@@ -46,26 +46,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const fetchCustomerProfile = useCallback(async (userId: string) => {
         if (!userId) return null;
         try {
-            console.log('fetchCustomerProfile attempt for:', userId);
-            const { data, error } = await supabase
-                .from('customer_profiles')
-                .select('*')
-                .eq('id', userId)
-                .single();
-
-            if (error) {
-                // Ignore AbortError and known cancellation signals
-                if (error.message?.includes('AbortError') || error.code === 'ABORTED' || error.message?.includes('signal is aborted')) {
-                    console.log('Fetch aborted, ignoring.');
-                    return null;
-                }
-                console.error('Error fetching profile:', error.message);
+            console.log('fetchCustomerProfile attempt (via Backend) for:', userId);
+            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+            const response = await fetch(`${API_URL}/api/profiles/${userId}`);
+            
+            if (!response.ok) {
+                console.error('Error fetching profile from backend');
                 return null;
             }
-            console.log('Profile data received, is_admin:', data?.is_admin);
+            
+            const data = await response.json();
+            console.log('Profile data received via backend, is_admin:', data?.is_admin);
             return data as CustomerProfile;
         } catch (err: unknown) {
-            if (err instanceof Error && err.name === 'AbortError') return null;
             console.error('Unexpected profile error:', err);
             return null;
         }
@@ -212,8 +205,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const updateProfile = useCallback(async (updates: Partial<CustomerProfile>): Promise<boolean> => {
         if (!user) return false;
         try {
-            const { error } = await supabase.from('customer_profiles').update(updates).eq('id', user.id);
-            if (error) return false;
+            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+            const response = await fetch(`${API_URL}/api/profiles/${user.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updates)
+            });
+            
+            if (!response.ok) return false;
+            
             const newProfile = await fetchCustomerProfile(user.id);
             setCustomerProfile(newProfile);
             return true;

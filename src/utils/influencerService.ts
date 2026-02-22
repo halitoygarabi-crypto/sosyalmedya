@@ -1,29 +1,40 @@
-import { supabase } from './supabaseService';
 import type { Influencer, ClientInfluencer } from '../types';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
+    const response = await fetch(`${API_URL}${endpoint}`, {
+        ...options,
+        headers: {
+            'Content-Type': 'application/json',
+            ...options.headers,
+        },
+    });
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'API Hatası');
+    }
+    return response.json();
+};
+
 // Helper: DB row → Influencer
-const rowToInfluencer = (row: Record<string, unknown>): Influencer => ({
-    id: row.id as string,
-    name: row.name as string,
-    avatarUrl: row.avatar_url as string | undefined,
-    style: row.style as string | undefined,
-    personality: row.personality as string | undefined,
-    voiceTone: row.voice_tone as string | undefined,
-    targetAudience: row.target_audience as string | undefined,
-    createdBy: row.created_by as string,
-    createdAt: row.created_at as string,
+const rowToInfluencer = (row: any): Influencer => ({
+    id: row.id,
+    name: row.name,
+    avatarUrl: row.avatar_url,
+    style: row.style,
+    personality: row.personality,
+    voiceTone: row.voice_tone,
+    targetAudience: row.target_audience,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
 });
 
 export const influencerService = {
     // Get all influencers
     list: async (): Promise<Influencer[]> => {
         try {
-            const { data, error } = await supabase
-                .from('influencers')
-                .select('*')
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
+            const data = await apiFetch('/api/influencers');
             return (data || []).map(rowToInfluencer);
         } catch (error) {
             console.error('influencerService.list error:', error);
@@ -34,9 +45,9 @@ export const influencerService = {
     // Create a new influencer
     create: async (influencer: Omit<Influencer, 'id' | 'createdAt'>): Promise<Influencer | null> => {
         try {
-            const { data, error } = await supabase
-                .from('influencers')
-                .insert({
+            const data = await apiFetch('/api/influencers', {
+                method: 'POST',
+                body: JSON.stringify({
                     name: influencer.name,
                     avatar_url: influencer.avatarUrl,
                     style: influencer.style,
@@ -45,10 +56,7 @@ export const influencerService = {
                     target_audience: influencer.targetAudience,
                     created_by: influencer.createdBy,
                 })
-                .select()
-                .single();
-
-            if (error) throw error;
+            });
             return data ? rowToInfluencer(data) : null;
         } catch (error) {
             console.error('influencerService.create error:', error);
@@ -59,12 +67,9 @@ export const influencerService = {
     // Delete an influencer
     delete: async (id: string): Promise<boolean> => {
         try {
-            const { error } = await supabase
-                .from('influencers')
-                .delete()
-                .eq('id', id);
-
-            if (error) throw error;
+            await apiFetch(`/api/influencers/${id}`, {
+                method: 'DELETE'
+            });
             return true;
         } catch (error) {
             console.error('influencerService.delete error:', error);
@@ -75,11 +80,10 @@ export const influencerService = {
     // Assign influencer to a client
     assignToClient: async (clientId: string, influencerId: string): Promise<boolean> => {
         try {
-            const { error } = await supabase
-                .from('client_influencers')
-                .insert({ client_id: clientId, influencer_id: influencerId });
-
-            if (error) throw error;
+            await apiFetch('/api/client-influencers', {
+                method: 'POST',
+                body: JSON.stringify({ client_id: clientId, influencer_id: influencerId })
+            });
             return true;
         } catch (error) {
             console.error('influencerService.assignToClient error:', error);
@@ -90,13 +94,9 @@ export const influencerService = {
     // Remove influencer from a client
     removeFromClient: async (clientId: string, influencerId: string): Promise<boolean> => {
         try {
-            const { error } = await supabase
-                .from('client_influencers')
-                .delete()
-                .eq('client_id', clientId)
-                .eq('influencer_id', influencerId);
-
-            if (error) throw error;
+            await apiFetch(`/api/client-influencers/${clientId}/${influencerId}`, {
+                method: 'DELETE'
+            });
             return true;
         } catch (error) {
             console.error('influencerService.removeFromClient error:', error);
@@ -107,22 +107,13 @@ export const influencerService = {
     // Get influencers assigned to a specific client
     getByClient: async (clientId: string): Promise<Influencer[]> => {
         try {
-            const { data, error } = await supabase
-                .from('client_influencers')
-                .select(`
-                    influencer_id,
-                    influencers (*)
-                `)
-                .eq('client_id', clientId);
-
-            if (error) throw error;
-
+            const data = await apiFetch(`/api/client-influencers/${clientId}`);
             return (data || [])
-                .map((row: Record<string, unknown>) => {
-                    const inf = row.influencers as Record<string, unknown> | null;
+                .map((row: any) => {
+                    const inf = row.influencers;
                     return inf ? rowToInfluencer(inf) : null;
                 })
-                .filter((inf): inf is Influencer => inf !== null);
+                .filter((inf: any): inf is Influencer => inf !== null);
         } catch (error) {
             console.error('influencerService.getByClient error:', error);
             return [];
@@ -132,18 +123,12 @@ export const influencerService = {
     // Get all client-influencer assignments
     getAssignments: async (): Promise<ClientInfluencer[]> => {
         try {
-            const { data, error } = await supabase
-                .from('client_influencers')
-                .select('*')
-                .order('assigned_at', { ascending: false });
-
-            if (error) throw error;
-
-            return (data || []).map((row: Record<string, unknown>) => ({
-                id: row.id as string,
-                clientId: row.client_id as string,
-                influencerId: row.influencer_id as string,
-                assignedAt: row.assigned_at as string,
+            const data = await apiFetch('/api/assignments');
+            return (data || []).map((row: any) => ({
+                id: row.id,
+                clientId: row.client_id,
+                influencerId: row.influencer_id,
+                assignedAt: row.assigned_at,
             }));
         } catch (error) {
             console.error('influencerService.getAssignments error:', error);

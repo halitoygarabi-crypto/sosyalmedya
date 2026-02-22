@@ -1,34 +1,52 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Post, PlatformStats, Notification, Client } from '../types';
 
+// Supabase client primarily for AUTH (client-side auth is standard)
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Helper: DB row'u Post tipine dönüştür
-const rowToPost = (row: Record<string, unknown>): Post => ({
-    id: row.id as string,
-    clientId: (row.customer_id as string) || 'default',
-    title: row.title as string,
-    content: row.content as string,
-    imageUrls: (row.image_urls as string[]) || [],
-    platforms: (row.platforms as Post['platforms']) || [],
-    scheduledTime: row.scheduled_time as string,
-    status: row.status as Post['status'],
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+// Helper for fetching from our local backend
+const apiFetch = async (endpoint: string, options: RequestInit = {}) => {
+    const response = await fetch(`${API_URL}${endpoint}`, {
+        ...options,
+        headers: {
+            'Content-Type': 'application/json',
+            ...options.headers,
+        },
+    });
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'API Hatası');
+    }
+    return response.json();
+};
+
+// Helper: Backend row'u Post tipine dönüştür
+const rowToPost = (row: any): Post => ({
+    id: row.id,
+    clientId: row.customer_id || 'default',
+    title: row.title,
+    content: row.content,
+    imageUrls: row.image_urls || [],
+    platforms: row.platforms || [],
+    scheduledTime: row.scheduled_time,
+    status: row.status,
     metrics: {
-        likes: (row.likes as number) || 0,
-        comments: (row.comments as number) || 0,
-        shares: (row.shares as number) || 0,
-        reach: (row.reach as number) || 0,
-        impressions: (row.impressions as number) || 0,
+        likes: row.likes || 0,
+        comments: row.comments || 0,
+        shares: row.shares || 0,
+        reach: row.reach || 0,
+        impressions: row.impressions || 0,
     },
-    createdBy: row.created_by as string,
-    createdAt: row.created_at as string,
-    errorMessage: row.error_message as string | undefined,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    errorMessage: row.error_message,
 });
 
-// Helper: Post'u DB row'a dönüştür
+// Helper: Post'u Backend row'a dönüştür
 const postToRow = (post: Post) => ({
     id: post.id,
     customer_id: post.clientId,
@@ -49,84 +67,68 @@ const postToRow = (post: Post) => ({
 });
 
 export const supabaseService = {
-    // Postları getir
     // --- Client / Customer Management ---
     fetchClients: async (): Promise<Client[]> => {
-        const { data, error } = await supabase
-            .from('clients_profiles')
-            .select('*')
-            .order('company_name', { ascending: true });
-
-        if (error) {
+        try {
+            return await apiFetch('/api/clients');
+        } catch (error) {
             console.error('Error fetching clients:', error);
             return [];
         }
-        return data || [];
     },
 
     createClient: async (client: Omit<Client, 'id' | 'created_at'>): Promise<Client | null> => {
-        const { data, error } = await supabase
-            .from('clients_profiles')
-            .insert([client])
-            .select()
-            .single();
-
-        if (error) {
+        try {
+            return await apiFetch('/api/clients', {
+                method: 'POST',
+                body: JSON.stringify(client)
+            });
+        } catch (error) {
             console.error('Error creating client:', error);
             return null;
         }
-        return data;
     },
 
     updateClient: async (id: string, updates: Partial<Client>): Promise<boolean> => {
-        const { error } = await supabase
-            .from('clients_profiles')
-            .update(updates)
-            .eq('id', id);
-
-        if (error) {
+        try {
+            await apiFetch(`/api/clients/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify(updates)
+            });
+            return true;
+        } catch (error) {
             console.error('Error updating client:', error);
             return false;
         }
-        return true;
     },
 
     // --- Original Services ---
     fetchPosts: async (): Promise<Post[]> => {
         try {
-            const { data, error } = await supabase
-                .from('posts')
-                .select('*')
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
+            const data = await apiFetch('/api/posts');
             return (data || []).map(rowToPost);
         } catch (error) {
-            console.error('Supabase fetchPosts error:', error);
+            console.error('API fetchPosts error:', error);
             return [];
         }
     },
 
-    // Yeni içerik oluştur
     createPost: async (post: Post): Promise<boolean> => {
         try {
-            const { error } = await supabase
-                .from('posts')
-                .insert([postToRow(post)]);
-
-            if (error) throw error;
+            await apiFetch('/api/posts', {
+                method: 'POST',
+                body: JSON.stringify(postToRow(post))
+            });
             return true;
         } catch (error) {
-            console.error('Supabase createPost error:', error);
+            console.error('API createPost error:', error);
             return false;
         }
     },
 
-    // Post güncelle
     updatePost: async (id: string, updates: Partial<Post>): Promise<boolean> => {
         try {
-            const updateData: Record<string, unknown> = {};
-
+            const updateData: Record<string, any> = {};
             if (updates.title) updateData.title = updates.title;
             if (updates.content) updateData.content = updates.content;
             if (updates.imageUrls) updateData.image_urls = updates.imageUrls;
@@ -142,118 +144,91 @@ export const supabaseService = {
             }
             if (updates.errorMessage) updateData.error_message = updates.errorMessage;
 
-            const { error } = await supabase
-                .from('posts')
-                .update(updateData)
-                .eq('id', id);
-
-            if (error) throw error;
+            await apiFetch(`/api/posts/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify(updateData)
+            });
             return true;
         } catch (error) {
-            console.error('Supabase updatePost error:', error);
+            console.error('API updatePost error:', error);
             return false;
         }
     },
 
-    // Post sil
     deletePost: async (id: string): Promise<boolean> => {
         try {
-            const { error } = await supabase
-                .from('posts')
-                .delete()
-                .eq('id', id);
-
-            if (error) throw error;
+            await apiFetch(`/api/posts/${id}`, {
+                method: 'DELETE'
+            });
             return true;
         } catch (error) {
-            console.error('Supabase deletePost error:', error);
+            console.error('API deletePost error:', error);
             return false;
         }
     },
 
-    // Platform istatistiklerini getir
     fetchStats: async (): Promise<PlatformStats[]> => {
         try {
-            const { data, error } = await supabase
-                .from('platform_stats')
-                .select('*');
-
-            if (error) throw error;
-
-            return (data || []).map((row) => ({
-                clientId: (row.client_id as string) || 'default',
-                platform: row.platform as PlatformStats['platform'],
+            const data = await apiFetch('/api/stats');
+            return (data || []).map((row: any) => ({
+                clientId: row.client_id || 'default',
+                platform: row.platform,
                 followers: row.followers || 0,
                 followerGrowth: row.follower_growth || 0,
                 avgEngagementRate: parseFloat(row.avg_engagement_rate) || 0,
                 postsCount: row.posts_count || 0,
-                bestPostingTime: row.best_posting_time || '',
                 reach: row.reach || 0,
                 impressions: row.impressions || 0,
             }));
         } catch (error) {
-            console.error('Supabase fetchStats error:', error);
+            console.error('API fetchStats error:', error);
             return [];
         }
     },
 
-    // Bildirimleri getir
     fetchNotifications: async (): Promise<Notification[]> => {
         try {
-            const { data, error } = await supabase
-                .from('notifications')
-                .select('*')
-                .order('timestamp', { ascending: false })
-                .limit(20);
-
-            if (error) throw error;
-
-            return (data || []).map((row) => ({
+            const data = await apiFetch('/api/notifications');
+            return (data || []).map((row: any) => ({
                 id: row.id,
-                type: row.type as Notification['type'],
+                type: row.type,
                 message: row.message,
                 timestamp: row.timestamp,
                 read: row.read,
             }));
         } catch (error) {
-            console.error('Supabase fetchNotifications error:', error);
+            console.error('API fetchNotifications error:', error);
             return [];
         }
     },
 
-    // Bildirim ekle
     addNotification: async (notification: Notification): Promise<boolean> => {
         try {
-            const { error } = await supabase
-                .from('notifications')
-                .insert([{
+            await apiFetch('/api/notifications', {
+                method: 'POST',
+                body: JSON.stringify({
                     id: notification.id,
                     type: notification.type,
                     message: notification.message,
                     timestamp: notification.timestamp,
                     read: notification.read,
-                }]);
-
-            if (error) throw error;
+                })
+            });
             return true;
         } catch (error) {
-            console.error('Supabase addNotification error:', error);
+            console.error('API addNotification error:', error);
             return false;
         }
     },
 
-    // Bildirimi okundu işaretle
     markNotificationRead: async (id: string): Promise<boolean> => {
         try {
-            const { error } = await supabase
-                .from('notifications')
-                .update({ read: true })
-                .eq('id', id);
-
-            if (error) throw error;
+            await apiFetch(`/api/notifications/${id}`, {
+                method: 'PATCH'
+            });
             return true;
         } catch (error) {
-            console.error('Supabase markNotificationRead error:', error);
+            console.error('API markNotificationRead error:', error);
             return false;
         }
     },
