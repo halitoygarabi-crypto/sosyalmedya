@@ -14,13 +14,12 @@ const LoginPage: React.FC = () => {
 
     // Oturum açıksa ve profil yüklendiyse yetkiye göre yönlendir
     React.useEffect(() => {
-        if (user && !authLoading && customerProfile) {
-            console.log('User logged in, customerProfile loaded, isAdmin:', isAdmin);
-            console.log('Profile is_admin value:', customerProfile.is_admin);
+        if (user && !authLoading) {
+            console.log('User logged in, checking roles... isAdmin:', isAdmin);
             if (isAdmin) {
                 console.log('Redirecting to /admin');
                 navigate('/admin', { replace: true });
-            } else {
+            } else if (customerProfile) {
                 console.log('Redirecting to /client');
                 navigate('/client', { replace: true });
             }
@@ -46,11 +45,11 @@ const LoginPage: React.FC = () => {
             <div className="auth-container">
                 <div className="auth-header">
                     <div className="auth-logo">
-                        <span className="logo-icon">📱</span>
+                        <div className="logo-icon">N99</div>
                         <span className="logo-text">SocialHub</span>
                     </div>
                     <h1>Hoş Geldiniz</h1>
-                    <p>Hesabınıza giriş yapın</p>
+                    <p>Sosyal medya yönetim merkezinize giriş yapın</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="auth-form">

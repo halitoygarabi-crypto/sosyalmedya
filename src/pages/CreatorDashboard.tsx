@@ -198,32 +198,32 @@ const CreatorDashboard: React.FC = () => {
                                 <h2 className="section-title">{selectedClient.company_name} — Genel Bakış</h2>
                             </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--spacing-lg)', marginBottom: 'var(--spacing-xl)' }}>
-                                <div className="card" style={{ padding: 'var(--spacing-lg)', display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
-                                    <div style={{ padding: '12px', borderRadius: '50%', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>
+                            <div className="kpi-grid" style={{ marginBottom: 'var(--spacing-xl)' }}>
+                                <div className="kpi-card">
+                                    <div className="kpi-icon" style={{ background: 'rgba(204, 255, 0, 0.1)', color: 'var(--accent-primary)' }}>
                                         <CheckCircle2 size={24} />
                                     </div>
                                     <div>
-                                        <div style={{ fontSize: '1.8rem', fontWeight: 700 }}>{postedCount}</div>
-                                        <div className="text-muted">Yayınlanan</div>
+                                        <div className="kpi-value">{postedCount}</div>
+                                        <div className="kpi-label">Yayınlanan</div>
                                     </div>
                                 </div>
-                                <div className="card" style={{ padding: 'var(--spacing-lg)', display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
-                                    <div style={{ padding: '12px', borderRadius: '50%', background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1' }}>
+                                <div className="kpi-card">
+                                    <div className="kpi-icon" style={{ background: 'rgba(0, 255, 255, 0.1)', color: 'var(--accent-secondary)' }}>
                                         <Clock size={24} />
                                     </div>
                                     <div>
-                                        <div style={{ fontSize: '1.8rem', fontWeight: 700 }}>{scheduledCount}</div>
-                                        <div className="text-muted">Bekleyen</div>
+                                        <div className="kpi-value">{scheduledCount}</div>
+                                        <div className="kpi-label">Bekleyen</div>
                                     </div>
                                 </div>
-                                <div className="card" style={{ padding: 'var(--spacing-lg)', display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
-                                    <div style={{ padding: '12px', borderRadius: '50%', background: 'rgba(236, 72, 153, 0.1)', color: '#ec4899' }}>
+                                <div className="kpi-card">
+                                    <div className="kpi-icon" style={{ background: 'rgba(255, 77, 77, 0.1)', color: '#ff4d4d' }}>
                                         <Heart size={24} />
                                     </div>
                                     <div>
-                                        <div style={{ fontSize: '1.8rem', fontWeight: 700 }}>{totalLikes.toLocaleString('tr-TR')}</div>
-                                        <div className="text-muted">Etkileşim</div>
+                                        <div className="kpi-value">{totalLikes.toLocaleString('tr-TR')}</div>
+                                        <div className="kpi-label">Etkileşim</div>
                                     </div>
                                 </div>
                             </div>

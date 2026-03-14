@@ -52,14 +52,49 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             
             if (!response.ok) {
                 console.error('Error fetching profile from backend');
-                return null;
+                throw new Error('Backend failed');
             }
             
             const data = await response.json();
             console.log('Profile data received via backend, is_admin:', data?.is_admin);
             return data as CustomerProfile;
         } catch (err: unknown) {
-            console.error('Unexpected profile error:', err);
+            console.warn('Backend fetch failed, falling back to Supabase:', err);
+            try {
+                // FALLBACK: Fetch directly from Supabase
+                const { data, error } = await supabase
+                    .from('customer_profiles')
+                    .select('*')
+                    .eq('id', userId)
+                    .single();
+                    
+                if (!error && data) {
+                    return data as CustomerProfile;
+                }
+            } catch (supErr) {
+                console.error('Supabase fallback error:', supErr);
+            }
+
+            // SAFETY NET: If everything fails for known admins, return mock profile to prevent being blocked
+            let currentEmail = '';
+            const { data: userData } = await supabase.auth.getUser();
+            if (userData?.user?.email) {
+                currentEmail = userData.user.email.toLowerCase().trim();
+            }
+            
+            const adminEmails = ['halitoygarabi@gmail.com', 'admin@test.com', 'admin2@test.com', 'admin3@test.com', 'admin4@test.com'];
+            if (adminEmails.includes(currentEmail)) {
+                return {
+                    id: userId,
+                    company_name: 'Admin Dashboard',
+                    industry: 'Teknoloji',
+                    logo_url: null,
+                    ai_prompt_prefix: 'Profesyonel',
+                    is_admin: true,
+                    role: 'admin',
+                    created_at: new Date().toISOString()
+                } as CustomerProfile;
+            }
             return null;
         }
     }, []);
@@ -223,8 +258,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }, [user, fetchCustomerProfile]);
 
     // Determine role: prefer explicit role field, fall back to is_admin boolean
-    const resolvedRole = customerProfile?.role
+    let resolvedRole = customerProfile?.role
         ?? (customerProfile?.is_admin ? 'admin' : 'client');
+
+    // Force Admin Override for all known admin emails
+    const adminEmails = ['halitoygarabi@gmail.com', 'admin@test.com', 'admin2@test.com', 'admin3@test.com', 'admin4@test.com'];
+    if (user?.email && adminEmails.includes(user.email.toLowerCase().trim())) {
+        resolvedRole = 'admin';
+    }
 
     const value: AuthContextType = {
         user,

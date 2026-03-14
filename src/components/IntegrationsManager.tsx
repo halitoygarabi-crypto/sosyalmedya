@@ -150,7 +150,16 @@ const IntegrationsManager: React.FC = () => {
         }
     ];
 
-    const systemIntegrations = [
+const systemIntegrations = [
+        {
+            id: 'postiz',
+            name: 'Postiz Command Center',
+            description: 'Sosyal medya yayın ve otomasyon motoru.',
+            status: 'connected',
+            url: import.meta.env.VITE_POSTIZ_API_URL || 'https://postiz.polmarkai.pro',
+            icon: <Zap size={20} />,
+            color: '#6366F1'
+        },
         {
             id: 'n99',
             name: 'n99 Orchestration',
@@ -547,26 +556,36 @@ const LimeSocialSettingsCard: React.FC = () => {
         limeSocialSettings, updateLimeSocialSettings, 
         aiSettings, updateAiSettings,
         n99Settings, updateN99Settings,
+        postizSettings, updatePostizSettings,
         addNotification 
     } = useDashboard();
     
     const [localLimeSettings, setLocalLimeSettings] = useState(limeSocialSettings);
     const [localAiSettings, setLocalAiSettings] = useState(aiSettings);
     const [localN99Settings, setLocalN99Settings] = useState(n99Settings);
+    const [localPostizSettings, setLocalPostizSettings] = useState(postizSettings);
     const [testResult, setTestResult] = useState<{ credits?: number; success?: boolean } | null>(null);
     const [replicateTest, setReplicateTest] = useState<{ success?: boolean; error?: string; loading?: boolean }>({});
     const [falTest, setFalTest] = useState<{ success?: boolean; error?: string; loading?: boolean }>({});
 
     const handleSaveLime = () => {
         updateLimeSocialSettings(localLimeSettings);
+        addNotification({ type: 'success', message: 'LimeSocial ayarları kaydedildi.', read: false });
+    };
+
+    const handleSavePostiz = () => {
+        updatePostizSettings(localPostizSettings);
+        addNotification({ type: 'success', message: 'Postiz ayarları kaydedildi.', read: false });
     };
 
     const handleSaveAi = () => {
         updateAiSettings(localAiSettings);
+        addNotification({ type: 'success', message: 'AI ayarları kaydedildi.', read: false });
     };
 
     const handleSaveN99 = () => {
         updateN99Settings(localN99Settings);
+        addNotification({ type: 'success', message: 'n99 ayarları kaydedildi.', read: false });
     };
 
     const testReplicate = async () => {
@@ -722,6 +741,47 @@ const LimeSocialSettingsCard: React.FC = () => {
                     <button className="btn btn-primary" onClick={handleSaveN99} style={{ background: '#FF6D5A', borderColor: '#FF6D5A', gap: '8px' }}>
                         <Save size={16} />
                         <span>Sistem Bağlantısını Kaydet</span>
+                    </button>
+                </div>
+            </div>
+
+            {/* Postiz Settings */}
+            <div className="section-header">
+                <h2 className="section-title">
+                    <Zap size={20} style={{ marginRight: '8px', color: '#6366F1' }} />
+                    Postiz Komuta Merkezi Ayarları
+                </h2>
+            </div>
+            <div className="card" style={{ padding: 'var(--spacing-xl)', borderLeft: '4px solid #6366F1' }}>
+                <p className="text-sm text-muted" style={{ marginBottom: 'var(--spacing-lg)' }}>
+                    Çoklu platform paylaşım motoru (Postiz) bağlantısını buradan yapılandırın.
+                </p>
+                <div className="grid-2" style={{ gap: 'var(--spacing-lg)' }}>
+                    <div className="input-group">
+                        <label className="input-label" style={{ fontWeight: 600 }}>Postiz API URL</label>
+                        <input
+                            type="text"
+                            className="input"
+                            placeholder="https://postiz.polmarkai.pro"
+                            value={localPostizSettings.baseUrl || ''}
+                            onChange={(e) => setLocalPostizSettings({ ...localPostizSettings, baseUrl: e.target.value })}
+                        />
+                    </div>
+                    <div className="input-group">
+                        <label className="input-label" style={{ fontWeight: 600 }}>Postiz API Key</label>
+                        <input
+                            type="password"
+                            className="input"
+                            placeholder="API Anahtarı..."
+                            value={localPostizSettings.apiKey || ''}
+                            onChange={(e) => setLocalPostizSettings({ ...localPostizSettings, apiKey: e.target.value })}
+                        />
+                    </div>
+                </div>
+                <div style={{ marginTop: 'var(--spacing-lg)', display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border-color)', paddingTop: 'var(--spacing-md)' }}>
+                    <button className="btn btn-primary" onClick={handleSavePostiz} style={{ background: '#6366F1', borderColor: '#6366F1', gap: '8px' }}>
+                        <Save size={16} />
+                        <span>Postiz Ayarlarını Kaydet</span>
                     </button>
                 </div>
             </div>

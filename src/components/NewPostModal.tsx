@@ -39,7 +39,11 @@ const NewPostModal: React.FC<NewPostModalProps> = ({ isOpen, onClose }) => {
                 try {
                     const data = JSON.parse(prefill);
                     if (data.prompt) setTitle(data.prompt);
+                    if (data.caption) setContent(data.caption + (data.hashtags ? '\n\n' + data.hashtags : ''));
                     if (data.imageUrl) setImageUrl(data.imageUrl);
+                    if (data.platform && data.platform !== 'all') {
+                        setPlatforms([data.platform as Platform]);
+                    }
                     if (data.type) {
                         setPostType(data.type === 'video' ? 'reel' : 'post');
                     }

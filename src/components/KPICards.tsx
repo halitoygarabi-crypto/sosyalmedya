@@ -131,22 +131,59 @@ const KPICards: React.FC = () => {
                     <div
                         className="kpi-icon"
                         style={{
-                            background: kpi.color,
+                            color: kpi.color,
+                            background: `${kpi.color}15`,
+                            boxShadow: `inset 0 0 10px ${kpi.color}20`
                         }}
                     >
                         {kpi.icon}
                     </div>
-                    <div className="kpi-value">{kpi.value}</div>
+                    
                     <div className="kpi-label">{kpi.label}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                        {kpi.subValue}
-                    </div>
-                    {kpi.change !== 0 && (
-                        <div className={`kpi-change ${kpi.change > 0 ? 'positive' : 'negative'}`}>
-                            {kpi.change > 0 ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
-                            {Math.abs(kpi.change)}%
+                    <div className="kpi-value">{kpi.value}</div>
+                    <div className="kpi-subtext">{kpi.subValue}</div>
+                    
+                    <div className="kpi-change-container">
+                        {kpi.change !== 0 ? (
+                            <div className={`kpi-change ${kpi.change > 0 ? 'positive' : 'negative'}`}>
+                                {kpi.change > 0 ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+                                <span>{Math.abs(kpi.change)}%</span>
+                            </div>
+                        ) : (
+                            <div className="kpi-change positive">
+                                <Send size={14} />
+                                <span>0%</span>
+                            </div>
+                        )}
+                        
+                        {/* Mock Sparkline SVG to match design */}
+                        <div className="kpi-sparkline">
+                            <svg viewBox="0 0 100 30" width="100%" height="100%" preserveAspectRatio="none">
+                                <path 
+                                    d={kpi.change >= 0 
+                                        ? "M0,25 Q15,10 30,22 T60,15 T90,5 T100,10" 
+                                        : "M0,5 Q15,20 30,8 T60,15 T90,25 T100,20"} 
+                                    fill="none" 
+                                    stroke={kpi.change >= 0 ? "var(--success)" : "var(--error)"} 
+                                    strokeWidth="2.5"
+                                    strokeLinecap="round"
+                                />
+                                <path 
+                                    d={kpi.change >= 0 
+                                        ? "M0,25 Q15,10 30,22 T60,15 T90,5 T100,10 L100,30 L0,30 Z" 
+                                        : "M0,5 Q15,20 30,8 T60,15 T90,25 T100,20 L100,30 L0,30 Z"} 
+                                    fill={`url(#gradient-${index})`}
+                                    opacity="0.15"
+                                />
+                                <defs>
+                                    <linearGradient id={`gradient-${index}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                                        <stop offset="0%" stopColor={kpi.change >= 0 ? "var(--success)" : "var(--error)"} />
+                                        <stop offset="100%" stopColor="transparent" />
+                                    </linearGradient>
+                                </defs>
+                            </svg>
                         </div>
-                    )}
+                    </div>
                 </div>
             ))}
         </div>

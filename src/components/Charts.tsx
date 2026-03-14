@@ -17,16 +17,17 @@ import {
     ResponsiveContainer,
 } from 'recharts';
 import { useDashboard } from '../context/DashboardContext';
-import { formatNumber, getPlatformColor, getPlatformName } from '../utils/helpers';
+import { formatNumber, getPlatformName } from '../utils/helpers';
 
 
 // Custom tooltip styles
 const customTooltipStyle = {
-    background: 'var(--bg-card)',
-    border: '1px solid var(--border-color)',
-    borderRadius: 'var(--radius-md)',
+    background: 'rgba(18, 20, 30, 0.95)',
+    backdropFilter: 'blur(12px)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    borderRadius: '12px',
     padding: '12px',
-    boxShadow: 'var(--shadow-lg)',
+    boxShadow: '0 10px 30px -10px rgba(0,0,0,0.5)',
 };
 
 // Engagement Trend Line Chart
@@ -38,15 +39,15 @@ export const EngagementTrendChart: React.FC = () => {
                 <h3 className="chart-title">Engagement Trendi (Son 30 Gün)</h3>
                 <div className="chart-legend">
                     <div className="legend-item">
-                        <span className="legend-dot" style={{ background: '#6366f1' }} />
+                        <span className="legend-dot" style={{ background: '#ccff00' }} />
                         <span>Beğeni</span>
                     </div>
                     <div className="legend-item">
-                        <span className="legend-dot" style={{ background: '#10b981' }} />
+                        <span className="legend-dot" style={{ background: '#00ffff' }} />
                         <span>Yorum</span>
                     </div>
                     <div className="legend-item">
-                        <span className="legend-dot" style={{ background: '#f59e0b' }} />
+                        <span className="legend-dot" style={{ background: '#ffffff' }} />
                         <span>Paylaşım</span>
                     </div>
                 </div>
@@ -54,61 +55,47 @@ export const EngagementTrendChart: React.FC = () => {
             <ResponsiveContainer width="100%" height={300}>
                 <AreaChart data={dailyEngagement}>
                     <defs>
-                        <linearGradient id="colorLikes" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                            <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                        </linearGradient>
-                        <linearGradient id="colorComments" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                            <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                        </linearGradient>
-                        <linearGradient id="colorShares" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
-                            <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                        <linearGradient id="colorEngagement" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#ccff00" stopOpacity={0.6} />
+                            <stop offset="95%" stopColor="#ccff00" stopOpacity={0} />
                         </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                    <CartesianGrid strokeDasharray="0" stroke="rgba(255,255,255,0.05)" vertical={false} />
                     <XAxis
                         dataKey="date"
                         stroke="var(--text-muted)"
-                        fontSize={12}
+                        axisLine={false}
+                        tickLine={false}
+                        fontSize={10}
                         tickFormatter={(value) => {
                             const date = new Date(value);
-                            return `${date.getDate()}/${date.getMonth() + 1}`;
+                            const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
+                            return date.toLocaleDateString('tr-TR', options);
                         }}
+                        dy={10}
                     />
-                    <YAxis stroke="var(--text-muted)" fontSize={12} tickFormatter={(v) => formatNumber(v)} />
+                    <YAxis 
+                        stroke="var(--text-muted)" 
+                        axisLine={false}
+                        tickLine={false}
+                        fontSize={10} 
+                        tickFormatter={(v) => formatNumber(v)} 
+                    />
                     <Tooltip
                         contentStyle={customTooltipStyle}
-                        labelStyle={{ color: 'var(--text-primary)' }}
-                        formatter={(value) => [formatNumber(value as number ?? 0), '']}
+                        labelStyle={{ color: 'var(--text-primary)', marginBottom: '8px', fontWeight: 600 }}
+                        itemStyle={{ padding: '2px 0' }}
+                        cursor={{ stroke: 'rgba(204, 255, 0, 0.2)', strokeWidth: 2 }}
                     />
                     <Area
                         type="monotone"
                         dataKey="likes"
-                        stroke="#6366f1"
-                        strokeWidth={2}
+                        stroke="#ccff00"
+                        strokeWidth={3}
                         fillOpacity={1}
-                        fill="url(#colorLikes)"
+                        fill="url(#colorEngagement)"
                         name="Beğeni"
-                    />
-                    <Area
-                        type="monotone"
-                        dataKey="comments"
-                        stroke="#10b981"
-                        strokeWidth={2}
-                        fillOpacity={1}
-                        fill="url(#colorComments)"
-                        name="Yorum"
-                    />
-                    <Area
-                        type="monotone"
-                        dataKey="shares"
-                        stroke="#f59e0b"
-                        strokeWidth={2}
-                        fillOpacity={1}
-                        fill="url(#colorShares)"
-                        name="Paylaşım"
+                        animationDuration={1500}
                     />
                 </AreaChart>
             </ResponsiveContainer>
@@ -122,7 +109,9 @@ export const PlatformDistributionChart: React.FC = () => {
     const data = platformStats.map((stat) => ({
         name: getPlatformName(stat.platform),
         value: stat.postsCount,
-        color: getPlatformColor(stat.platform),
+        color: stat.platform === 'instagram' ? '#ccff00' : 
+               stat.platform === 'twitter' ? '#00ffff' : 
+               stat.platform === 'linkedin' ? '#ffffff' : '#ccff00',
     }));
 
     return (
@@ -136,15 +125,14 @@ export const PlatformDistributionChart: React.FC = () => {
                         data={data}
                         cx="50%"
                         cy="50%"
-                        innerRadius={60}
+                        innerRadius={70}
                         outerRadius={100}
-                        paddingAngle={5}
+                        paddingAngle={8}
                         dataKey="value"
-                        label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
-                        labelLine={false}
+                        stroke="none"
                     >
                         {data.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
+                            <Cell key={`cell-${index}`} fill={entry.color} opacity={0.8} />
                         ))}
                     </Pie>
                     <Tooltip
@@ -171,42 +159,42 @@ export const PlatformComparisonChart: React.FC = () => {
     const data = platformStats.map((stat) => ({
         platform: getPlatformName(stat.platform),
         reach: stat.reach / 1000,
-        engagement: stat.avgEngagementRate * 10000,
-        color: getPlatformColor(stat.platform),
+        engagement: stat.avgEngagementRate * 100,
     }));
 
     return (
         <div className="chart-container">
             <div className="chart-header">
                 <h3 className="chart-title">Platform Karşılaştırması</h3>
-                <div className="chart-legend">
-                    <div className="legend-item">
-                        <span className="legend-dot" style={{ background: '#6366f1' }} />
-                        <span>Erişim (K)</span>
-                    </div>
-                    <div className="legend-item">
-                        <span className="legend-dot" style={{ background: '#10b981' }} />
-                        <span>Engagement</span>
-                    </div>
-                </div>
             </div>
             <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={data} barGap={8}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-                    <XAxis dataKey="platform" stroke="var(--text-muted)" fontSize={12} />
-                    <YAxis stroke="var(--text-muted)" fontSize={12} />
+                <BarChart data={data} barGap={12} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="0" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                    <XAxis 
+                        dataKey="platform" 
+                        stroke="var(--text-muted)" 
+                        fontSize={10} 
+                        axisLine={false}
+                        tickLine={false}
+                        dy={10}
+                    />
+                    <YAxis 
+                        stroke="var(--text-muted)" 
+                        fontSize={10} 
+                        axisLine={false}
+                        tickLine={false}
+                    />
                     <Tooltip
                         contentStyle={customTooltipStyle}
-                        formatter={(value, name) => {
-                            const numValue = (value as number) ?? 0;
-                            return [
-                                name === 'reach' ? `${numValue.toFixed(0)}K` : numValue.toFixed(0),
-                                name === 'reach' ? 'Erişim' : 'Engagement',
-                            ];
-                        }}
+                        cursor={{fill: 'rgba(255,255,255,0.03)'}}
                     />
-                    <Bar dataKey="reach" fill="#6366f1" radius={[4, 4, 0, 0]} name="reach" />
-                    <Bar dataKey="engagement" fill="#10b981" radius={[4, 4, 0, 0]} name="engagement" />
+                    <Bar 
+                        dataKey="reach" 
+                        fill="#ccff00" 
+                        radius={[6, 6, 0, 0]} 
+                        barSize={40}
+                        name="Erişim (K)" 
+                    />
                 </BarChart>
             </ResponsiveContainer>
         </div>
@@ -223,17 +211,26 @@ export const ReachTrendChart: React.FC = () => {
             </div>
             <ResponsiveContainer width="100%" height={250}>
                 <LineChart data={dailyEngagement}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                    <CartesianGrid strokeDasharray="0" stroke="rgba(255,255,255,0.05)" vertical={false} />
                     <XAxis
                         dataKey="date"
                         stroke="var(--text-muted)"
-                        fontSize={12}
+                        axisLine={false}
+                        tickLine={false}
+                        fontSize={10}
                         tickFormatter={(value) => {
                             const date = new Date(value);
                             return `${date.getDate()}/${date.getMonth() + 1}`;
                         }}
+                        dy={10}
                     />
-                    <YAxis stroke="var(--text-muted)" fontSize={12} tickFormatter={(v) => formatNumber(v)} />
+                    <YAxis 
+                        stroke="var(--text-muted)" 
+                        axisLine={false}
+                        tickLine={false}
+                        fontSize={10} 
+                        tickFormatter={(v) => formatNumber(v)} 
+                    />
                     <Tooltip
                         contentStyle={customTooltipStyle}
                         formatter={(value) => [formatNumber((value as number) ?? 0), 'Erişim']}
@@ -241,10 +238,10 @@ export const ReachTrendChart: React.FC = () => {
                     <Line
                         type="monotone"
                         dataKey="reach"
-                        stroke="#8b5cf6"
-                        strokeWidth={3}
+                        stroke="#00ffff"
+                        strokeWidth={4}
                         dot={false}
-                        activeDot={{ r: 6, fill: '#8b5cf6' }}
+                        activeDot={{ r: 6, fill: '#00ffff', stroke: 'white', strokeWidth: 2 }}
                     />
                 </LineChart>
             </ResponsiveContainer>
@@ -264,21 +261,17 @@ export const FollowerGrowthChart: React.FC = () => {
         const ig = platformStats.find(s => s.platform === 'instagram');
         const tw = platformStats.find(s => s.platform === 'twitter' || (s.platform as string) === 'x');
         const li = platformStats.find(s => s.platform === 'linkedin');
-        const tt = platformStats.find(s => s.platform === 'tiktok');
 
         for (let i = 29; i >= 0; i--) {
             const date = new Date(today);
             date.setDate(date.getDate() - i);
             const dateStr = date.toISOString().split('T')[0];
 
-            // Project backwards from current followers using growth rate (simple linear projection)
-            // growth / 30 gives a rough daily average
             history.push({
                 date: dateStr,
                 instagram: ig ? Math.round(Math.max(0, ig.followers - (i * (ig.followerGrowth / 30)))) : 0,
                 twitter: tw ? Math.round(Math.max(0, tw.followers - (i * (tw.followerGrowth / 30)))) : 0,
                 linkedin: li ? Math.round(Math.max(0, li.followers - (i * (li.followerGrowth / 30)))) : 0,
-                tiktok: tt ? Math.round(Math.max(0, tt.followers - (i * (tt.followerGrowth / 30)))) : 0,
             });
         }
         return history;
@@ -291,27 +284,34 @@ export const FollowerGrowthChart: React.FC = () => {
             </div>
             <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={data}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                    <CartesianGrid strokeDasharray="0" stroke="rgba(255,255,255,0.05)" vertical={false} />
                     <XAxis
                         dataKey="date"
                         stroke="var(--text-muted)"
-                        fontSize={12}
+                        axisLine={false}
+                        tickLine={false}
+                        fontSize={10}
                         tickFormatter={(value) => {
                             const date = new Date(value);
                             return `${date.getDate()}/${date.getMonth() + 1}`;
                         }}
+                        dy={10}
                     />
-                    <YAxis stroke="var(--text-muted)" fontSize={12} tickFormatter={(v) => formatNumber(v)} />
+                    <YAxis 
+                        stroke="var(--text-muted)" 
+                        axisLine={false}
+                        tickLine={false}
+                        fontSize={10} 
+                        tickFormatter={(v) => formatNumber(v)} 
+                    />
                     <Tooltip
                         contentStyle={customTooltipStyle}
-                        labelStyle={{ color: 'var(--text-primary)' }}
-                        formatter={(value) => [formatNumber(value as number ?? 0), '']}
+                        labelStyle={{ color: 'var(--text-primary)', marginBottom: '4px' }}
                     />
-                    <Legend />
-                    <Line type="monotone" dataKey="instagram" stroke="#E4405F" strokeWidth={2} dot={false} name="Instagram" />
-                    <Line type="monotone" dataKey="twitter" stroke="#1DA1F2" strokeWidth={2} dot={false} name="Twitter/X" />
-                    <Line type="monotone" dataKey="linkedin" stroke="#0A66C2" strokeWidth={2} dot={false} name="LinkedIn" />
-                    <Line type="monotone" dataKey="tiktok" stroke="#00f2ea" strokeWidth={2} dot={false} name="TikTok" />
+                    <Legend iconType="circle" />
+                    <Line type="monotone" dataKey="instagram" stroke="#ccff00" strokeWidth={3} dot={false} name="Instagram" />
+                    <Line type="monotone" dataKey="twitter" stroke="#00ffff" strokeWidth={3} dot={false} name="Twitter/X" />
+                    <Line type="monotone" dataKey="linkedin" stroke="#ffffff" strokeWidth={3} dot={false} name="LinkedIn" />
                 </LineChart>
             </ResponsiveContainer>
         </div>

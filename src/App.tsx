@@ -30,12 +30,16 @@ import {
 } from './components/EngagementMetrics';
 import ReportsSection from './components/ReportsSection';
 import IntegrationsManager from './components/IntegrationsManager';
-import VideoGenerator from './components/VideoGenerator';
-import AIInfluencerGenerator from './components/AIInfluencerGenerator';
-import ContentHistory from './components/ContentHistory';
-import DistributionPlannerModal from './components/DistributionPlannerModal';
+import {
+  PostizCommandCenter,
+  VideoGenerator,
+  AIInfluencerGenerator,
+  ContentHistory,
+  DistributionPlannerModal,
+} from './components';
 import { Filter, CheckCircle, AlertCircle, Clock, ExternalLink, Trash2, Upload } from 'lucide-react';
 import { formatRelativeTime } from './utils/helpers';
+import AssistantChat from './components/AssistantChat';
 
 const DashboardContent: React.FC = () => {
   const {
@@ -76,6 +80,13 @@ const DashboardContent: React.FC = () => {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
   }, [isDarkMode]);
+
+  // Asistan içerik aksiyonu
+  useEffect(() => {
+    const handler = () => setShowNewPostModal(true);
+    window.addEventListener('assistant-open-post', handler);
+    return () => window.removeEventListener('assistant-open-post', handler);
+  }, []);
 
   // Handle responsive sidebar
   useEffect(() => {
@@ -239,6 +250,10 @@ const DashboardContent: React.FC = () => {
 
           {activeSection === 'video-generator' && (
             <VideoGenerator />
+          )}
+
+          {activeSection === 'postiz' && (
+            <PostizCommandCenter />
           )}
 
           {activeSection === 'ai-influencer' && (
@@ -558,6 +573,20 @@ const DashboardContent: React.FC = () => {
 };
 
 
+// Authenticated assistant wrapper
+const AppAssistant: React.FC = () => {
+  const { user, userRole, customerProfile } = useAuth();
+  const { activeSection } = useDashboard();
+  if (!user) return null;
+  return (
+    <AssistantChat
+      userRole={userRole}
+      companyName={customerProfile?.company_name}
+      activeSection={activeSection}
+    />
+  );
+};
+
 // Role-based redirect component
 const RoleBasedRedirect: React.FC = () => {
   const { userRole, isLoading, user } = useAuth();
@@ -633,6 +662,7 @@ export const App: React.FC = () => {
               />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+                  <AppAssistant />
                 </DashboardProvider>
               </PostProvider>
             </SettingsProvider>

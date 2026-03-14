@@ -32,6 +32,7 @@ interface NavItem {
 
 const mainNavItems: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+    { id: 'postiz', label: 'Komuta Merkezi', icon: <Zap size={18} />, badge: 0 },
     { id: 'content', label: 'İçerikler', icon: <FileText size={18} />, badge: 3 },
     { id: 'video-generator', label: 'Video Üretici', icon: <Video size={18} /> },
     { id: 'ai-influencer', label: 'AI Influencer', icon: <Users size={18} /> },

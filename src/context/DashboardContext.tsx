@@ -29,6 +29,10 @@ interface DashboardContextType {
         apiKey: string;
         accounts: string;
     };
+    postizSettings: {
+        baseUrl: string;
+        apiKey: string;
+    };
     aiSettings: {
         replicateKey: string;
         falKey: string;
@@ -59,6 +63,7 @@ interface DashboardContextType {
     updateAiSettings: (settings: Partial<DashboardContextType['aiSettings'] | { falKey: string }>) => void;
     updateGoogleSheetsSettings: (settings: Partial<DashboardContextType['googleSheetsSettings']>) => void;
     updateN99Settings: (settings: Partial<DashboardContextType['n99Settings']>) => void;
+    updatePostizSettings: (settings: Partial<DashboardContextType['postizSettings']>) => void;
     publishPost: (post: Post) => Promise<void>;
     syncLimeSocialHistory: () => Promise<void>;
 }
@@ -85,6 +90,10 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
     const [limeSocialSettings, setLimeSocialSettings] = useState({ 
         apiKey: import.meta.env.VITE_LIMESOCIAL_API_KEY || '', 
         accounts: '' 
+    });
+    const [postizSettings, setPostizSettings] = useState({ 
+        baseUrl: import.meta.env.VITE_POSTIZ_API_URL || '', 
+        apiKey: import.meta.env.VITE_POSTIZ_API_KEY || '' 
     });
     const [googleSheetsSettings, setGoogleSheetsSettings] = useState({ 
         webhookUrl: import.meta.env.VITE_GOOGLE_SHEETS_CONTENT_URL || '' 
@@ -127,6 +136,7 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
         },
         googleSheetsSettings,
         n99Settings,
+        postizSettings,
         
         setPosts, addPost, updatePost, deletePost,
         toggleDarkMode, setSelectedPlatform, setSelectedStatus,
@@ -137,6 +147,7 @@ export const DashboardProvider: React.FC<{ children: ReactNode }> = ({ children 
         updateAiSettings: (s) => updateAISettings(s),
         updateGoogleSheetsSettings: (s) => setGoogleSheetsSettings(prev => ({ ...prev, ...s })),
         updateN99Settings: (s) => setN99Settings(prev => ({ ...prev, ...s })),
+        updatePostizSettings: (s) => setPostizSettings(prev => ({ ...prev, ...s })),
         publishPost, syncLimeSocialHistory
     };
 

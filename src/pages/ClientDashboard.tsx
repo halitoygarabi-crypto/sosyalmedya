@@ -25,7 +25,6 @@ import {
     Area,
     XAxis,
     YAxis,
-    CartesianGrid,
     Tooltip,
     ResponsiveContainer,
     PieChart as RechartsPieChart,
@@ -73,38 +72,47 @@ const KPICard: React.FC<{
     change: number;
     icon: React.ReactNode;
     color: string;
-}> = ({ title, value, change, icon, color }) => (
-    <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+}> = ({ title, value, change, icon }) => (
+    <div className="kpi-card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative', zIndex: 1 }}>
             <div>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>{title}</p>
-                <p style={{ fontSize: '1.75rem', fontWeight: 700 }}>{value}</p>
+                <p className="kpi-label">{title}</p>
+                <p className="kpi-value" style={{ margin: '0.25rem 0' }}>{value}</p>
+                
+                <div className="kpi-change-container" style={{ margin: 0 }}>
+                    <div className={`kpi-change-badge ${change >= 0 ? 'positive' : 'negative'}`}>
+                        {change >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                        <span>{Math.abs(change)}%</span>
+                    </div>
+                </div>
             </div>
-            <div
-                style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: 'var(--radius-md)',
-                    background: `${color}15`,
-                    color: color,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                }}
-            >
+            <div className="kpi-icon">
                 {icon}
             </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: 'var(--spacing-sm)' }}>
-            {change >= 0 ? (
-                <TrendingUp size={14} style={{ color: 'var(--success)' }} />
-            ) : (
-                <TrendingDown size={14} style={{ color: 'var(--error)' }} />
-            )}
-            <span style={{ fontSize: '0.75rem', color: change >= 0 ? 'var(--success)' : 'var(--error)' }}>
-                {change >= 0 ? '+' : ''}{change}%
-            </span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>geçen haftaya göre</span>
+        
+        {/* Mock Sparkline UI */}
+        <div className="kpi-sparkline" style={{ marginTop: '1.5rem', opacity: 0.6 }}>
+            <div style={{ 
+                height: '40px', 
+                width: '100%', 
+                background: `linear-gradient(90deg, transparent 0%, var(--accent-primary) 50%, transparent 100%)`, 
+                maskImage: 'linear-gradient(to bottom, black, transparent)',
+                WebkitMaskImage: 'linear-gradient(to bottom, black, transparent)',
+                borderRadius: '4px',
+                position: 'relative',
+                overflow: 'hidden'
+            }}>
+                <div style={{
+                    position: 'absolute',
+                    top: '20px',
+                    left: 0,
+                    right: 0,
+                    height: '2px',
+                    background: 'var(--accent-primary)',
+                    boxShadow: '0 0 10px var(--accent-primary)'
+                }}></div>
+            </div>
         </div>
     </div>
 );
@@ -120,11 +128,11 @@ const WeeklyReportCard: React.FC = () => {
     };
 
     return (
-        <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-lg)' }}>
+        <div className="card">
+            <div className="card-header">
                 <div>
-                    <h3 style={{ fontSize: '1rem', fontWeight: 600 }}>Haftalık Özet</h3>
-                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>27 Ocak - 2 Şubat 2026</p>
+                    <h3 className="card-title">Haftalık Özet</h3>
+                    <p className="card-subtitle">27 Ocak - 2 Şubat 2026</p>
                 </div>
                 <button className="btn btn-secondary btn-sm">
                     <Download size={14} />
@@ -132,33 +140,34 @@ const WeeklyReportCard: React.FC = () => {
                 </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--spacing-md)' }}>
-                <div style={{ padding: 'var(--spacing-md)', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
-                    <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Toplam Post</p>
-                    <p style={{ fontSize: '1.25rem', fontWeight: 600 }}>{currentWeek.posts}</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+                <div style={{ padding: '1rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Toplam Post</p>
+                    <p style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}>{currentWeek.posts}</p>
                 </div>
-                <div style={{ padding: 'var(--spacing-md)', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
-                    <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Toplam Etkileşim</p>
-                    <p style={{ fontSize: '1.25rem', fontWeight: 600 }}>{formatNumber(currentWeek.totalEngagement)}</p>
+                <div style={{ padding: '1rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Toplam Etkileşim</p>
+                    <p style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}>{formatNumber(currentWeek.totalEngagement)}</p>
                 </div>
-                <div style={{ padding: 'var(--spacing-md)', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
-                    <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Ort. Erişim</p>
-                    <p style={{ fontSize: '1.25rem', fontWeight: 600 }}>{formatNumber(currentWeek.avgReach)}</p>
+                <div style={{ padding: '1rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Ort. Erişim</p>
+                    <p style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}>{formatNumber(currentWeek.avgReach)}</p>
                 </div>
-                <div style={{ padding: 'var(--spacing-md)', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' }}>
-                    <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>En İyi Platform</p>
-                    <p style={{ fontSize: '1.25rem', fontWeight: 600 }}>{currentWeek.topPlatform}</p>
+                <div style={{ padding: '1rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>En İyi Platform</p>
+                    <p style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}>{currentWeek.topPlatform}</p>
                 </div>
             </div>
 
             <div style={{
-                marginTop: 'var(--spacing-lg)',
-                padding: 'var(--spacing-md)',
-                background: 'var(--success-bg)',
-                borderRadius: 'var(--radius-md)',
+                marginTop: '1.5rem',
+                padding: '1rem',
+                background: 'rgba(204, 255, 0, 0.05)',
+                border: '1px solid rgba(204, 255, 0, 0.1)',
+                borderRadius: '12px',
                 textAlign: 'center'
             }}>
-                <p style={{ fontSize: '0.875rem', color: 'var(--success)' }}>
+                <p style={{ fontSize: '0.875rem', color: 'var(--accent-primary)', fontWeight: 500 }}>
                     📈 Bu hafta geçen haftaya göre <strong>{currentWeek.growth}</strong> büyüme sağladınız!
                 </p>
             </div>
@@ -168,39 +177,55 @@ const WeeklyReportCard: React.FC = () => {
 
 // Follower Growth Chart
 const FollowerGrowthChart: React.FC = () => (
-    <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-lg)' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 600 }}>Takipçi Büyümesi</h3>
+    <div className="card">
+        <div className="card-header">
+            <h3 className="card-title">Takipçi Büyümesi</h3>
             <select className="input" style={{ width: 'auto', padding: '4px 12px', fontSize: '0.75rem' }}>
                 <option>Son 7 Gün</option>
                 <option>Son 30 Gün</option>
                 <option>Son 90 Gün</option>
             </select>
         </div>
-        <ResponsiveContainer width="100%" height={200}>
+        <ResponsiveContainer width="100%" height={240}>
             <AreaChart data={weeklyData}>
                 <defs>
                     <linearGradient id="followerGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                        <stop offset="5%" stopColor="var(--accent-primary)" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="var(--accent-primary)" stopOpacity={0} />
                     </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-                <XAxis dataKey="day" stroke="var(--text-muted)" fontSize={12} />
-                <YAxis stroke="var(--text-muted)" fontSize={12} domain={['dataMin - 100', 'dataMax + 100']} />
+                <XAxis 
+                    dataKey="day" 
+                    stroke="var(--text-muted)" 
+                    fontSize={12} 
+                    axisLine={false}
+                    tickLine={false}
+                    dy={10}
+                />
+                <YAxis 
+                    stroke="var(--text-muted)" 
+                    fontSize={12} 
+                    axisLine={false}
+                    tickLine={false}
+                    domain={['dataMin - 100', 'dataMax + 100']} 
+                />
                 <Tooltip
                     contentStyle={{
-                        background: 'var(--bg-card)',
+                        background: 'rgba(5, 6, 10, 0.8)',
+                        backdropFilter: 'blur(10px)',
                         border: '1px solid var(--border-color)',
-                        borderRadius: 'var(--radius-md)'
+                        borderRadius: 'var(--radius-md)',
+                        boxShadow: 'var(--shadow-xl)'
                     }}
+                    itemStyle={{ color: 'var(--accent-primary)' }}
                 />
                 <Area
                     type="monotone"
                     dataKey="followers"
-                    stroke="#6366f1"
-                    strokeWidth={2}
+                    stroke="var(--accent-primary)"
+                    strokeWidth={3}
                     fill="url(#followerGradient)"
+                    animationDuration={1500}
                 />
             </AreaChart>
         </ResponsiveContainer>
@@ -209,49 +234,50 @@ const FollowerGrowthChart: React.FC = () => (
 
 // Platform Distribution Chart
 const PlatformDistributionChart: React.FC = () => (
-    <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
-        <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--spacing-lg)' }}>Platform Dağılımı</h3>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-lg)' }}>
-            <ResponsiveContainer width={120} height={120}>
+    <div className="card">
+        <h3 className="card-title" style={{ marginBottom: '1.5rem' }}>Platform Dağılımı</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+            <ResponsiveContainer width={140} height={140}>
                 <RechartsPieChart>
                     <Pie
                         data={platformDistribution}
                         cx="50%"
                         cy="50%"
-                        innerRadius={35}
-                        outerRadius={55}
-                        paddingAngle={2}
+                        innerRadius={45}
+                        outerRadius={65}
+                        paddingAngle={5}
                         dataKey="value"
+                        animationDuration={1500}
                     >
                         {platformDistribution.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
+                            <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
                         ))}
                     </Pie>
                 </RechartsPieChart>
             </ResponsiveContainer>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {platformDistribution.map((item) => (
                     <div
                         key={item.name}
                         style={{
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'space-between',
-                            marginBottom: 'var(--spacing-xs)'
+                            justifyContent: 'space-between'
                         }}
                     >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                             <span
                                 style={{
-                                    width: '8px',
-                                    height: '8px',
+                                    width: '10px',
+                                    height: '10px',
                                     borderRadius: '50%',
-                                    background: item.color
+                                    background: item.color,
+                                    boxShadow: `0 0 10px ${item.color}`
                                 }}
                             />
-                            <span style={{ fontSize: '0.875rem' }}>{item.name}</span>
+                            <span style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)' }}>{item.name}</span>
                         </div>
-                        <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>%{item.value}</span>
+                        <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>%{item.value}</span>
                     </div>
                 ))}
             </div>
@@ -261,76 +287,83 @@ const PlatformDistributionChart: React.FC = () => (
 
 // Top Posts List
 const TopPostsList: React.FC = () => {
-    const getPlatformColor = (platform: string) => {
-        const colors: Record<string, string> = {
-            instagram: '#E4405F',
-            twitter: '#1DA1F2',
-            linkedin: '#0A66C2',
-            tiktok: '#00f2ea'
-        };
-        return colors[platform] || '#6366f1';
+    const platformColors: Record<string, string> = {
+        instagram: '#ccff00',
+        twitter: '#00ffff',
+        linkedin: '#0A66C2',
+        tiktok: '#00f2ea'
     };
 
     return (
-        <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--spacing-lg)' }}>
+        <div className="card">
+            <h3 className="card-title" style={{ marginBottom: '1.5rem' }}>
                 En İyi Performans Gösteren Postlar
             </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
-                {topPosts.map((post, index) => (
-                    <div
-                        key={post.id}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 'var(--spacing-md)',
-                            padding: 'var(--spacing-sm)',
-                            background: 'var(--bg-tertiary)',
-                            borderRadius: 'var(--radius-md)'
-                        }}
-                    >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {topPosts.length === 0 ? (
+                    <div className="empty-state" style={{ padding: '2rem' }}>
+                        <Eye size={32} style={{ opacity: 0.2, marginBottom: '1rem' }} />
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Henüz veri bulunmuyor</p>
+                    </div>
+                ) : (
+                    topPosts.map((post, index) => (
                         <div
+                            key={post.id}
                             style={{
-                                width: '24px',
-                                height: '24px',
-                                borderRadius: 'var(--radius-full)',
-                                background: index < 3 ? 'var(--accent-gradient)' : 'var(--bg-hover)',
                                 display: 'flex',
                                 alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '0.75rem',
-                                fontWeight: 600,
-                                color: index < 3 ? 'white' : 'var(--text-muted)'
+                                gap: '1rem',
+                                padding: '0.875rem',
+                                background: 'rgba(255, 255, 255, 0.02)',
+                                border: '1px solid rgba(255, 255, 255, 0.05)',
+                                borderRadius: '12px',
+                                transition: 'all 0.2s ease'
                             }}
                         >
-                            {index + 1}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                            <p style={{ fontSize: '0.875rem', fontWeight: 500 }}>{post.title}</p>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', marginTop: '2px' }}>
-                                <span
-                                    style={{
-                                        fontSize: '0.65rem',
-                                        padding: '1px 6px',
-                                        borderRadius: 'var(--radius-sm)',
-                                        background: `${getPlatformColor(post.platform)}20`,
-                                        color: getPlatformColor(post.platform)
-                                    }}
-                                >
-                                    {post.platform}
-                                </span>
-                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                                    <Heart size={10} style={{ display: 'inline', marginRight: '2px' }} />
-                                    {post.engagement}
-                                </span>
-                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                                    <Eye size={10} style={{ display: 'inline', marginRight: '2px' }} />
-                                    {formatNumber(post.reach)}
-                                </span>
+                            <div
+                                style={{
+                                    width: '28px',
+                                    height: '28px',
+                                    borderRadius: '8px',
+                                    background: index < 3 ? 'var(--accent-gradient)' : 'rgba(255, 255, 255, 0.05)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '0.8125rem',
+                                    fontWeight: 700,
+                                    color: index < 3 ? '#000' : 'var(--text-muted)',
+                                    boxShadow: index < 3 ? '0 0 10px rgba(204, 255, 0, 0.2)' : 'none'
+                                }}
+                            >
+                                {index + 1}
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <p style={{ fontSize: '0.9375rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {post.title}
+                                </p>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '4px' }}>
+                                    <span
+                                        style={{
+                                            fontSize: '0.7rem',
+                                            fontWeight: 700,
+                                            textTransform: 'uppercase',
+                                            letterSpacing: '0.02em',
+                                            color: platformColors[post.platform.toLowerCase()] || 'var(--accent-primary)'
+                                        }}
+                                    >
+                                        {post.platform}
+                                    </span>
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                        <Heart size={12} /> {post.engagement}
+                                    </span>
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                        <Eye size={12} /> {formatNumber(post.reach)}
+                                    </span>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                ))}
+                    ))
+                )}
             </div>
         </div>
     );
@@ -351,7 +384,7 @@ const ClientSidebar: React.FC<{
         { id: 'weekly-report', label: 'Haftalık Rapor', icon: <Calendar size={18} /> },
         { id: 'monthly-report', label: 'Aylık Rapor', icon: <FileText size={18} /> },
         { id: 'ai-influencer', label: 'AI Influencer', icon: <Users size={18} /> },
-        { id: 'settings', label: 'Firma Ayarları', icon: <Settings size={18} /> },
+        { id: 'settings', label: 'Firma Ayarlar', icon: <Settings size={18} /> },
     ];
 
     return (
@@ -362,27 +395,28 @@ const ClientSidebar: React.FC<{
                 <span className="nav-logo-text">SocialHub</span>
             </div>
 
-            {/* Company Name */}
-            <div style={{ padding: '0 var(--spacing-lg)', marginBottom: 'var(--spacing-xl)' }}>
+            {/* Company Name Badge */}
+            <div style={{ padding: '0 1rem', marginBottom: '2rem' }}>
                 <div style={{
-                    padding: 'var(--spacing-sm) var(--spacing-md)',
-                    background: 'var(--accent-gradient)',
-                    borderRadius: 'var(--radius-md)',
-                    color: 'white',
-                    fontWeight: 600,
-                    fontSize: '0.9rem',
+                    padding: '0.875rem 1rem',
+                    background: 'rgba(204, 255, 0, 0.05)',
+                    border: '1px solid rgba(204, 255, 0, 0.1)',
+                    borderRadius: '12px',
+                    color: 'var(--accent-primary)',
+                    fontWeight: 700,
+                    fontSize: '0.875rem',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 'var(--spacing-sm)'
+                    gap: '0.75rem'
                 }}>
-                    <div style={{ width: '8px', height: '8px', background: 'white', borderRadius: '50%', boxShadow: '0 0 8px white' }}></div>
+                    <div style={{ width: '8px', height: '8px', background: 'var(--accent-primary)', borderRadius: '50%', boxShadow: '0 0 10px var(--accent-primary)' }}></div>
                     {customerProfile?.company_name || 'Firma'}
                 </div>
             </div>
 
             {/* Navigation */}
             <nav className="nav-section">
-                <div className="nav-section-title">Menü</div>
+                <div className="nav-section-title">Panel</div>
                 {menuItems.map((item) => (
                     <div
                         key={item.id}
@@ -461,43 +495,39 @@ const ClientDashboard: React.FC = () => {
             />
 
             <main className={`main-content ${!sidebarOpen ? 'main-content-expanded' : ''}`}>
-                {/* Simple Header */}
-                <header style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: 'var(--spacing-xl)',
-                    padding: 'var(--spacing-md) 0'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
+                <header className="header">
+                    <div className="header-left">
                         <button
                             className="btn btn-secondary"
                             onClick={() => setSidebarOpen(!sidebarOpen)}
-                            style={{ padding: '8px' }}
+                            style={{ padding: '10px', minWidth: 'auto' }}
                         >
                             <Menu size={20} />
                         </button>
                         <div>
-                            <h1 style={{ fontSize: '1.5rem', fontWeight: 700 }}>
-                                Hoş geldiniz, {customerProfile?.company_name || 'Müşteri'}
+                            <h1 className="greeting">
+                                Hoş geldin, {customerProfile?.company_name || 'Müşteri'}
                             </h1>
-                            <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-                                Sosyal medya performansınızın özeti
+                            <p className="date-display">
+                                Sosyal medya performansınızın özeti • Bugüne Odaklan
                             </p>
                         </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
-                        <button className="btn btn-secondary" style={{ padding: '8px' }}>
-                            <Bell size={18} />
-                        </button>
-                        <button
-                            className="btn btn-secondary"
-                            onClick={handleRefresh}
-                            disabled={isRefreshing}
-                        >
-                            <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
-                            <span>Güncelle</span>
-                        </button>
+                    <div className="header-right">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+                            <button className="btn btn-secondary" style={{ padding: '10px', minWidth: 'auto' }}>
+                                <Bell size={18} />
+                            </button>
+                            <button
+                                className="btn btn-primary"
+                                onClick={handleRefresh}
+                                disabled={isRefreshing}
+                                style={{ padding: '0.625rem 1.25rem' }}
+                            >
+                                <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
+                                <span>{isRefreshing ? 'Güncelleniyor...' : 'Verileri Güncelle'}</span>
+                            </button>
+                        </div>
                     </div>
                 </header>
 

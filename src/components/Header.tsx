@@ -105,7 +105,13 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, onNewPost, companyName, on
                         </p>
                         <div className={`badge ${limeSocialSettings?.apiKey ? 'badge-success' : 'badge-error'}`} style={{ fontSize: '0.65rem', padding: '1px 8px' }}>
                             <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'currentColor', marginRight: '4px' }}></div>
-                            LimeSocial API: {limeSocialSettings?.apiKey ? 'Bağlı' : 'Bağlı Değil'}
+                            LimeSocial: {limeSocialSettings?.apiKey ? 'Aktif' : 'Pasif'}
+                        </div>
+                        <div className={`badge ${useDashboard().postizSettings?.apiKey ? 'badge-success' : 'badge-warning'}`} 
+                             onClick={() => onSectionChange?.('postiz')}
+                             style={{ fontSize: '0.65rem', padding: '1px 8px', cursor: 'pointer' }}>
+                            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'currentColor', marginRight: '4px' }}></div>
+                            Postiz Engine: {useDashboard().postizSettings?.apiKey ? 'Hazır' : 'Yapılandırılmadı'}
                         </div>
                     </div>
                 </div>
